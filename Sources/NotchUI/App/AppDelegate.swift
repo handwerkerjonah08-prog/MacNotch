@@ -105,6 +105,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Scripted tour used by CI to screenshot every state of the real app, one step every 4 seconds.
     private func runDemo() {
         showDemoBackdrop()
+        if let screen = NotchWindowController.targetScreen() {
+            let lab = GlassLab.show(on: screen)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.6) { lab.orderOut(nil) }
+        }
         music.preview(track: DemoContent.track, state: .playing, artwork: DemoContent.artwork(), elapsed: 150)
         let steps: [() -> Void] = [
             { [weak self] in self?.island.forceInputs(IslandInputs(nowPlayingActive: true)) },
