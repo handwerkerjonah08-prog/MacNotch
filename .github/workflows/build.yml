@@ -1,0 +1,76 @@
+name: Build & Test
+
+on:
+  push:
+    branches: ["**"]
+    tags-ignore: ["**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: Unit tests
+        run: swift test 2>&1 | tee test.log; exit ${PIPESTATUS[0]}
+
+      - name: Package app and DMG
+        run: scripts/build-app.sh "$(cat VERSION)" "${{ github.run_number }}"
+
+      - name: Render snapshots
+        run: build/MacNotch.app/Contents/MacOS/MacNotch --render-snapshots build/snapshots
+
+      - name: Smoke test the real app
+        run: scripts/smoke-test.sh
+
+      - name: Upload artifacts
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: MacNotch-${{ github.run_number }}
+          path: |
+            build/MacNotch.dmg
+            build/snapshots
+            build/screens
+            build/app.log
+            test.log
+          if-no-files-found: ignore
+
+      - name: Publish preview build
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd build
+          shopt -s nullglob
+          gh release delete ci-preview --yes --cleanup-tag || true
+          gh release create ci-preview MacNotch.dmg snapshots/*.png screens/*.png \
+            --prerelease --title "Preview build" \
+            --notes "Automatic build of ${GITHUB_SHA::7}. For testing; use the latest numbered release to install." \
+            --target "$GITHUB_SHA"
+
+      - name: Publish release
+        if: success() && contains(github.event.head_commit.message, '[release]')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(cat VERSION)"
+          gh release delete "v$VERSION" --yes --cleanup-tag || true
+          gh release create "v$VERSION" build/MacNotch.dmg \
+            --title "MacNotch $VERSION" --notes-file RELEASE_NOTES.md --latest --target "$GITHUB_SHA"
