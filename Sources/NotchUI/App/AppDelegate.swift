@@ -111,12 +111,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             { [weak self] in self?.island.forceInputs(IslandInputs(nowPlayingActive: true, alert: .charging(level: 82))) },
             { [weak self] in self?.island.forceInputs(IslandInputs(isPinnedOpen: true, nowPlayingActive: true)) },
             { [weak self] in self?.settings.settings.glassTint = 0 },
+            { [weak self] in self?.settings.settings.glassTint = 1 },
             { [weak self] in
                 self?.settings.settings.glassTint = AppSettings.default.glassTint
-                self?.settings.settings.islandMaterial = .black
+                self?.setDemoBackdrop(light: true)
             },
+            { [weak self] in self?.settings.settings.islandMaterial = .black },
             { [weak self] in
                 self?.settings.settings.islandMaterial = .liquidGlass
+                self?.setDemoBackdrop(light: false)
                 self?.island.forceInputs(IslandInputs())
                 self?.showSettings(.general)
             },
@@ -137,20 +140,28 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showDemoBackdrop() {
         guard let screen = NotchWindowController.targetScreen() else { return }
         let window = NSWindow(contentRect: screen.visibleFrame, styleMask: [.borderless], backing: .buffered, defer: false)
-        window.contentView = NSHostingView(rootView: DemoBackdrop())
+        window.contentView = NSHostingView(rootView: DemoBackdrop(light: false))
         window.level = .normal
         window.isReleasedWhenClosed = false
         window.setFrame(screen.frame, display: true)
         window.orderFrontRegardless()
         demoBackdrop = window
     }
+
+    private func setDemoBackdrop(light: Bool) {
+        demoBackdrop?.contentView = NSHostingView(rootView: DemoBackdrop(light: light))
+    }
 }
 
 private struct DemoBackdrop: View {
+    let light: Bool
+
     var body: some View {
         ZStack {
             LinearGradient(
-                colors: [Color(red: 0.86, green: 0.55, blue: 0.95), Color(red: 0.5, green: 0.2, blue: 0.85), Color(red: 0.12, green: 0.04, blue: 0.3)],
+                colors: light
+                    ? [Color(red: 0.97, green: 0.97, blue: 1), Color(red: 0.8, green: 0.9, blue: 1), Color(red: 0.98, green: 0.85, blue: 0.9)]
+                    : [Color(red: 0.86, green: 0.55, blue: 0.95), Color(red: 0.5, green: 0.2, blue: 0.85), Color(red: 0.12, green: 0.04, blue: 0.3)],
                 startPoint: .top,
                 endPoint: .bottom
             )

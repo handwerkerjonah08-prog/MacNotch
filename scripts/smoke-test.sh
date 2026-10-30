@@ -30,15 +30,17 @@ shoot_at() {
   screencapture -x "build/screens/$name.png" 2>/dev/null || echo "screencapture unavailable for $name"
 }
 
-shoot_at 3  screen-1-compact
-shoot_at 7  screen-2-charging
-shoot_at 11 screen-3-expanded-glass
-shoot_at 15 screen-4-expanded-glass-clear
-shoot_at 19 screen-5-expanded-black
-shoot_at 23 screen-6-settings-general
-shoot_at 27 screen-7-settings-widgets
-shoot_at 31 screen-8-settings-web-pages
-shoot_at 35 screen-9-settings-appearance
+shoot_at 3  screen-01-compact
+shoot_at 7  screen-02-charging
+shoot_at 11 screen-03-expanded-glass
+shoot_at 15 screen-04-expanded-glass-clear
+shoot_at 19 screen-05-expanded-glass-tinted
+shoot_at 23 screen-06-expanded-glass-light-wallpaper
+shoot_at 27 screen-07-expanded-black-light-wallpaper
+shoot_at 31 screen-08-settings-general
+shoot_at 35 screen-09-settings-widgets
+shoot_at 39 screen-10-settings-web-pages
+shoot_at 43 screen-11-settings-appearance
 
 if kill -0 "$PID" 2>/dev/null; then
   echo "MacNotch ran the full demo without crashing"
