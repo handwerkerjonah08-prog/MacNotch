@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 /// Where the notch is on a screen, in AppKit screen coordinates (origin bottom-left).

@@ -77,8 +77,16 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         }
         let window = self.window ?? makeWindow()
         self.window = window
+        // Behave like a regular app while Settings is open so it comes to the front, gets a Dock
+        // icon and works with Command-Tab. Back to menu-bar-only when it closes.
+        NSApp.setActivationPolicy(.regular)
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
     }
 
     private func makeWindow() -> NSWindow {
