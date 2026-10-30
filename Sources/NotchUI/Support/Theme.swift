@@ -58,7 +58,17 @@ private struct ForceGlassFallbackKey: EnvironmentKey {
     static let defaultValue = false
 }
 
+private struct SnapshotRenderingKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
 extension EnvironmentValues {
+    /// True while rendering PNG snapshots, so views can skip AppKit-backed modifiers.
+    var isSnapshotRendering: Bool {
+        get { self[SnapshotRenderingKey.self] }
+        set { self[SnapshotRenderingKey.self] = newValue }
+    }
+
     /// ImageRenderer can't draw real Liquid Glass, so snapshots use the drawn approximation.
     var forceGlassFallback: Bool {
         get { self[ForceGlassFallbackKey.self] }

@@ -26,6 +26,7 @@ struct IslandRootView: View {
 struct IslandView: View {
     @ObservedObject var model: IslandViewModel
     @EnvironmentObject private var settings: SettingsModel
+    @Environment(\.isSnapshotRendering) private var isSnapshot
 
     var body: some View {
         let presentation = model.presentation
@@ -59,14 +60,7 @@ struct IslandView: View {
         )
         .scaleEffect(peek ? 1.035 : 1, anchor: .top)
         .onTapGesture { model.islandTapped() }
-        .onDrop(of: [.fileURL], isTargeted: $model.isDropTargeted) { providers in
-            model.handleDrop(providers)
-        }
-        .contextMenu {
-            Button("Settings…") { model.openSettings() }
-            Divider()
-            Button("Quit MacNotch") { NSApp.terminate(nil) }
-        }
+        .modifier(IslandInteractions(model: model, enabled: !isSnapshot))
         .animation(Theme.microSpring, value: peek)
         .animation(Theme.openSpring, value: settings.settings.enabledWidgetKinds)
         .animation(Theme.openSpring, value: settings.settings.shortcuts.count)
@@ -87,6 +81,30 @@ struct IslandView: View {
         case .expanded:
             ExpandedIslandView(model: model)
                 .transition(.islandContent)
+        }
+    }
+}
+
+/// File drops and the right-click menu. Skipped in snapshots because ImageRenderer can't draw
+/// the AppKit views behind them.
+private struct IslandInteractions: ViewModifier {
+    @ObservedObject var model: IslandViewModel
+    let enabled: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if enabled {
+            content
+                .onDrop(of: [.fileURL], isTargeted: $model.isDropTargeted) { providers in
+                    model.handleDrop(providers)
+                }
+                .contextMenu {
+                    Button("Settings…") { model.openSettings() }
+                    Divider()
+                    Button("Quit MacNotch") { NSApp.terminate(nil) }
+                }
+        } else {
+            content
         }
     }
 }

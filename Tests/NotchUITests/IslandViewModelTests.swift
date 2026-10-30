@@ -168,7 +168,8 @@ final class IslandViewModelTests: XCTestCase {
         ]
         for input in inputs {
             model.forceInputs(input)
-            let renderer = ImageRenderer(content: SnapshotScene(model: model, canvas: CGSize(width: 1100, height: 260)).environment(\.forceGlassFallback, true))
+            let renderer = ImageRenderer(content: SnapshotScene(model: model, canvas: CGSize(width: 1100, height: 260)).environment(\.forceGlassFallback, true)
+                .environment(\.isSnapshotRendering, true))
             renderer.scale = 1
             let image = renderer.cgImage
             XCTAssertNotNil(image, "\(model.presentation)")

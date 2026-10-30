@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import NotchCore
+import SwiftUI
 
 @MainActor
 public final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -101,28 +102,66 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
-    /// Scripted tour used by CI to screenshot every state of the real app.
+    /// Scripted tour used by CI to screenshot every state of the real app, one step every 4 seconds.
     private func runDemo() {
-        let artwork = DemoContent.artwork()
-        music.preview(track: DemoContent.track, state: .playing, artwork: artwork, elapsed: 150)
-        let steps: [(Double, () -> Void)] = [
-            (1.0, { [weak self] in self?.island.forceInputs(IslandInputs(nowPlayingActive: true)) }),
-            (4.0, { [weak self] in self?.island.forceInputs(IslandInputs(nowPlayingActive: true, alert: .charging(level: 82))) }),
-            (7.0, { [weak self] in self?.island.forceInputs(IslandInputs(isPinnedOpen: true, nowPlayingActive: true)) }),
-            (11.0, { [weak self] in self?.settings.settings.islandMaterial = .black }),
-            (14.0, { [weak self] in
+        showDemoBackdrop()
+        music.preview(track: DemoContent.track, state: .playing, artwork: DemoContent.artwork(), elapsed: 150)
+        let steps: [() -> Void] = [
+            { [weak self] in self?.island.forceInputs(IslandInputs(nowPlayingActive: true)) },
+            { [weak self] in self?.island.forceInputs(IslandInputs(nowPlayingActive: true, alert: .charging(level: 82))) },
+            { [weak self] in self?.island.forceInputs(IslandInputs(isPinnedOpen: true, nowPlayingActive: true)) },
+            { [weak self] in self?.settings.settings.glassTint = 0 },
+            { [weak self] in
+                self?.settings.settings.glassTint = AppSettings.default.glassTint
+                self?.settings.settings.islandMaterial = .black
+            },
+            { [weak self] in
                 self?.settings.settings.islandMaterial = .liquidGlass
                 self?.island.forceInputs(IslandInputs())
                 self?.showSettings(.general)
-            }),
-            (17.0, { [weak self] in self?.showSettings(.webPages) }),
-            (20.0, { [weak self] in self?.showSettings(.appearance) })
+            },
+            { [weak self] in self?.showSettings(.widgets) },
+            { [weak self] in self?.showSettings(.webPages) },
+            { [weak self] in self?.showSettings(.appearance) }
         ]
-        for (delay, action) in steps {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+        for (index, action) in steps.enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1 + Double(index) * 4) {
                 MainActor.assumeIsolated { action() }
             }
         }
+    }
+
+    private var demoBackdrop: NSWindow?
+
+    /// A colorful window behind the island so CI screenshots show the glass is see-through.
+    private func showDemoBackdrop() {
+        guard let screen = NotchWindowController.targetScreen() else { return }
+        let window = NSWindow(contentRect: screen.visibleFrame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView = NSHostingView(rootView: DemoBackdrop())
+        window.level = .normal
+        window.isReleasedWhenClosed = false
+        window.setFrame(screen.frame, display: true)
+        window.orderFrontRegardless()
+        demoBackdrop = window
+    }
+}
+
+private struct DemoBackdrop: View {
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color(red: 0.86, green: 0.55, blue: 0.95), Color(red: 0.5, green: 0.2, blue: 0.85), Color(red: 0.12, green: 0.04, blue: 0.3)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            HStack(spacing: 40) {
+                Circle().fill(Color.orange).frame(width: 220)
+                RoundedRectangle(cornerRadius: 40).fill(Color.cyan).frame(width: 260, height: 160)
+                Circle().fill(Color.pink).frame(width: 180)
+            }
+            .offset(y: -150)
+        }
+        .ignoresSafeArea()
     }
 }
 

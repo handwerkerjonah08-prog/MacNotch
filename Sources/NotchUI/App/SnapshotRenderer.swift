@@ -103,6 +103,7 @@ public enum SnapshotRenderer {
             island.forceInputs(inputs)
             let scene = SnapshotScene(model: island, canvas: CGSize(width: 1100, height: height))
                 .environment(\.forceGlassFallback, true)
+                .environment(\.isSnapshotRendering, true)
             let renderer = ImageRenderer(content: scene)
             renderer.scale = 2
             guard let image = renderer.cgImage,

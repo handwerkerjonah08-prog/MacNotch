@@ -19,6 +19,7 @@ struct SettingsRootView: View {
             }
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 190, ideal: 205, max: 260)
+            .toolbar(removing: .sidebarToggle)
         } detail: {
             let pane = router.selection ?? .general
             detail(for: pane)
