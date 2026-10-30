@@ -32,8 +32,12 @@ struct GlassFill<S: Shape>: View {
     private var systemGlass: some View {
         #if compiler(>=6.2)
         if #available(macOS 26.0, *) {
-            Color.clear
-                .glassEffect(.regular.tint(Color.black.opacity(0.22 + 0.68 * tint)), in: shape)
+            ZStack {
+                Color.clear
+                    .glassEffect(.regular.tint(Color.black.opacity(0.2 + 0.4 * tint)), in: shape)
+                // System glass tint is only a hint, so the slider also darkens the pane directly.
+                shape.fill(Color.black.opacity(0.62 * tint))
+            }
         } else {
             BlurGlass(shape: shape, tint: tint)
         }

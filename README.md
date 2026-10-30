@@ -22,7 +22,7 @@ This takes about two minutes, and you won't need Terminal.
 ### 1. Download
 
 1. Go to **github.com/handwerkerjonah08-prog/MacNotch** and sign in to GitHub.
-2. On the right side of the page, click **Releases**, then click the newest **MacNotch** release.
+2. On the right side of the page, click **Releases**, then click **MacNotch 1.0.0** (the one marked **Latest**). Skip anything called "Preview build"; those are test builds.
 3. Under **Assets**, click **MacNotch.dmg**. It saves to your Downloads folder.
 
 ### 2. Install
