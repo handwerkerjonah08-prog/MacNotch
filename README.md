@@ -2,18 +2,27 @@
 
 MacNotch is a Dynamic Island for your MacBook. It sits over the notch the way the iPhone's island sits over the camera.
 
-![MacNotch icon](Resources/AppIcon.png)
+![MacNotch: the island open in Liquid Glass](docs/screenshots/expanded-glass.png)
 
 ## What it does
 
 - **Live Activities beside the notch.** When Apple Music is playing, the notch widens to show the album art on one side and moving sound bars on the other. Plugging in, unplugging and low battery (20% and 10%) each get a short iPhone-style alert.
+- **You choose what sits beside the notch.** Pick weather, battery, time, date or your shelf count for each side, or nothing at all.
 - **Hover to open.** Move your pointer onto the notch and the island springs open into a Liquid Glass panel with your widgets. Move away and it tucks back in. If you'd rather click, you can change that in Settings.
 - **Widgets you choose:**
   - **Now Playing:** artwork, song, a progress bar you can drag, and play, pause and skip buttons
   - **Weather:** current temperature, conditions and today's high and low for any city
-  - **Web Pages:** icons for your saved sites, like Discord or YouTube. Click one to open it in your browser.
+  - **Web Pages:** icons for your saved sites, like Discord or YouTube. Click one to open it in your browser. Icons show just the logo, with no tile behind them.
   - **File Shelf:** drag files onto the notch to park them, then drag them out wherever you need them
-- **Make it yours.** Turn widgets on or off, reorder them, add or remove web pages, change the weather city, switch between Liquid Glass and Classic Black, and set how clear or tinted the glass looks.
+- **Edit it right in the island.** Click the grid button and everything wiggles like your iPhone's home screen. Drag widgets and web page icons to rearrange them, tap the minus to remove one, and use Add Widget to bring one back.
+- **Save links by dropping them.** Drag a link from your browser's address bar onto the notch and it becomes a web page icon.
+- **Apple's Liquid Glass.** On macOS 27 you get the new iOS 27 generation of Liquid Glass, straight from the system. There's a Clear-to-Tinted slider and a Classic Black option too.
+
+| Beside the notch | Edit mode |
+| --- | --- |
+| ![Weather and time beside the notch](docs/screenshots/notch-info.png) | ![Edit mode with wiggling widgets](docs/screenshots/edit-mode.png) |
+
+![Settings](docs/screenshots/settings-notch.png)
 
 ## Install it on your MacBook
 
@@ -21,8 +30,8 @@ This takes about two minutes, and you won't need Terminal.
 
 ### 1. Download
 
-1. Go to **github.com/handwerkerjonah08-prog/MacNotch** and sign in to GitHub.
-2. On the right side of the page, click **Releases**, then click **MacNotch 1.0.0** (the one marked **Latest**). Skip anything called "Preview build"; those are test builds.
+1. Go to **github.com/handwerkerjonah08-prog/MacNotch**. You don't need to sign in.
+2. On the right side of the page, click **Releases**, then click the newest **MacNotch** release (the one marked **Latest**). Skip anything called "Preview build"; those are test builds.
 3. Under **Assets**, click **MacNotch.dmg**. It saves to your Downloads folder.
 
 ### 2. Install
@@ -57,7 +66,10 @@ That's it. The island opens for a few seconds to say hi, and the MacNotch Settin
 | Open the island | Move your pointer onto the notch |
 | Close it | Move your pointer away |
 | Open a web page | Click its icon in the island |
-| Remove a web page | Right-click its icon and choose **Remove** |
+| Save a web page | Drag a link from your browser onto the notch, or use **Settings › Web Pages** |
+| Rearrange or remove widgets and icons | Click the grid button in the island (or right-click it and choose **Edit Widgets**), drag things around, tap a minus to remove, then **Done** |
+| Bring a widget back | In edit mode, click **Add Widget** |
+| Choose what sits beside the notch | **Settings › Notch** |
 | Park a file | Drag it onto the notch and let go |
 | Use a parked file | Drag it out of the island, or double-click to open it |
 | Open Settings | Click the gear in the island, right-click the island, or use the MacNotch icon in the menu bar |
@@ -102,8 +114,8 @@ scripts/            build-app.sh (app bundle + DMG) and smoke-test.sh (CI demo r
 - Package: `scripts/build-app.sh 1.0.0 1` creates `build/MacNotch.app` and `build/MacNotch.dmg`
 - Render every island state to PNG: `build/MacNotch.app/Contents/MacOS/MacNotch --render-snapshots build/snapshots`
 
-Requires macOS 14 or later. Liquid Glass needs macOS 26 or later and the Xcode 26 SDK; older systems get a drawn version that looks close.
+Requires macOS 14 or later. Liquid Glass needs macOS 26 or later; releases are built with Xcode 27 so macOS 27 shows the newest glass. Older systems get a frosted blur that looks close.
 
-Every push runs the GitHub Actions workflow in `.github/workflows/build.yml`, which runs the tests, packages the DMG, renders snapshots and launches the app to check it doesn't crash. A commit message containing `[release]` publishes the DMG as a numbered release.
+Every push runs the GitHub Actions workflow in `.github/workflows/build.yml` on macOS 27 with Xcode 27. It runs the tests, packages the DMG and renders snapshots. It also launches the real app, walks it through every state, and drives the real mouse pointer to hover the notch, enter edit mode, drag a widget, remove one and open Settings. A commit message containing `[release]` publishes the DMG as a numbered release.
 
 Weather data comes from [Open-Meteo](https://open-meteo.com) (CC BY 4.0).

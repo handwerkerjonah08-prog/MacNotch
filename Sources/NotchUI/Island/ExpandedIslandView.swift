@@ -277,16 +277,29 @@ struct RemoveBadge: View {
     }
 }
 
-/// iPhone home screen edit-mode wiggle.
+/// iPhone home screen edit-mode wiggle. A repeating animation, so SwiftUI only interpolates the angle
+/// instead of rebuilding the card every frame.
 struct Wiggle: ViewModifier {
     let isActive: Bool
     let seed: Double
+    @State private var tilted = false
+
+    private var duration: Double {
+        0.12 + abs(seed).truncatingRemainder(dividingBy: 5) * 0.008
+    }
 
     func body(content: Content) -> some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isActive)) { context in
-            let time = context.date.timeIntervalSinceReferenceDate
-            let angle = isActive ? sin(time * 2 * .pi * 3.1 + seed) * 1.1 : 0
-            content.rotationEffect(.degrees(angle))
-        }
+        content
+            .rotationEffect(.degrees(isActive ? (tilted ? 1.1 : -1.1) : 0))
+            .animation(
+                isActive ? .easeInOut(duration: duration).repeatForever(autoreverses: true) : .easeOut(duration: 0.15),
+                value: tilted
+            )
+            .onAppear {
+                if isActive { tilted.toggle() }
+            }
+            .onChange(of: isActive) { _, active in
+                tilted = active ? !tilted : false
+            }
     }
 }
