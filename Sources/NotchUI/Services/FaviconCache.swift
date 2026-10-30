@@ -1,14 +1,16 @@
 import AppKit
 import NotchCore
 
-/// A site's icon, plus whether it's a dark one-color logo that should be inverted to show on dark glass.
+/// A site's logo with any solid tile behind it removed, plus whether it's a dark one-color logo
+/// that should be inverted to show on dark glass.
 struct SiteIcon {
     let image: NSImage
     let invertsOnDark: Bool
 
     init(image: NSImage) {
-        self.image = image
-        invertsOnDark = ImageColor.isDarkMonochromeGlyph(image)
+        let logo = ImageColor.removingBackground(image) ?? image
+        self.image = logo
+        invertsOnDark = ImageColor.isDarkMonochromeGlyph(logo)
     }
 }
 

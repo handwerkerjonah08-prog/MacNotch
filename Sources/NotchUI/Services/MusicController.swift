@@ -387,6 +387,113 @@ enum ImageColor {
         return Sample(coverage: opaque / total, luminance: luminance / opaque, saturation: saturation / opaque)
     }
 
+    /// Cuts the solid tile out from behind a site's logo so only the logo remains.
+    /// When the tile was a brand color and the logo is white or gray, the logo takes on the brand color
+    /// (Claude's orange tile becomes an orange starburst). Returns nil when there's no clean tile to remove.
+    static func removingBackground(_ image: NSImage) -> NSImage? {
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+        let side = 96
+        let space = CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
+        var pixels = [UInt8](repeating: 0, count: side * side * 4)
+        let drawn: Bool = pixels.withUnsafeMutableBytes { buffer in
+            guard let context = CGContext(
+                data: buffer.baseAddress, width: side, height: side,
+                bitsPerComponent: 8, bytesPerRow: side * 4, space: space, bitmapInfo: bitmapInfo
+            ) else { return false }
+            context.interpolationQuality = .high
+            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: side, height: side))
+            return true
+        }
+        guard drawn else { return nil }
+
+        func pixel(_ index: Int) -> (color: RGB, alpha: Double) {
+            let alpha = Double(pixels[index + 3]) / 255
+            guard alpha > 0 else { return (RGB(red: 0, green: 0, blue: 0), 0) }
+            return (RGB(
+                red: min(1, Double(pixels[index]) / 255 / alpha),
+                green: min(1, Double(pixels[index + 1]) / 255 / alpha),
+                blue: min(1, Double(pixels[index + 2]) / 255 / alpha)
+            ), alpha)
+        }
+        func distance(_ a: RGB, _ b: RGB) -> Double {
+            max(abs(a.red - b.red), abs(a.green - b.green), abs(a.blue - b.blue))
+        }
+        func mean(_ colors: [RGB]) -> RGB {
+            let count = Double(max(colors.count, 1))
+            return RGB(
+                red: colors.reduce(0) { $0 + $1.red } / count,
+                green: colors.reduce(0) { $0 + $1.green } / count,
+                blue: colors.reduce(0) { $0 + $1.blue } / count
+            )
+        }
+        func byte(_ value: Double) -> UInt8 {
+            UInt8(max(0, min(255, (value * 255).rounded())))
+        }
+
+        // Only filled (or rounded-corner) tiles qualify.
+        var opaque = 0
+        for index in stride(from: 0, to: pixels.count, by: 4) where pixels[index + 3] > 128 {
+            opaque += 1
+        }
+        guard Double(opaque) / Double(side * side) >= 0.85 else { return nil }
+
+        // The tile color is whatever fills the outer band, if that band is one even color.
+        let band = 6
+        var border: [RGB] = []
+        for y in 0..<side {
+            for x in 0..<side where x < band || y < band || x >= side - band || y >= side - band {
+                let sample = pixel((y * side + x) * 4)
+                if sample.alpha > 0.8 { border.append(sample.color) }
+            }
+        }
+        guard border.count > 80 else { return nil }
+        let rough = mean(border)
+        let matching = border.filter { distance($0, rough) < 0.16 }
+        guard Double(matching.count) / Double(border.count) >= 0.75 else { return nil }
+        let background = mean(matching)
+
+        // Key the tile color out with a soft edge so the logo stays anti-aliased.
+        var output = pixels
+        var kept = 0
+        var logoSaturation = 0.0
+        for index in stride(from: 0, to: pixels.count, by: 4) {
+            let sample = pixel(index)
+            guard sample.alpha > 0 else { continue }
+            let t = min(max((distance(sample.color, background) - 0.1) / 0.2, 0), 1)
+            let alpha = sample.alpha * t * t * (3 - 2 * t)
+            if alpha > 0.5 {
+                kept += 1
+                logoSaturation += ColorMath.hsb(from: sample.color).saturation
+            }
+            output[index] = byte(sample.color.red * alpha)
+            output[index + 1] = byte(sample.color.green * alpha)
+            output[index + 2] = byte(sample.color.blue * alpha)
+            output[index + 3] = byte(alpha)
+        }
+        let coverage = Double(kept) / Double(side * side)
+        guard coverage > 0.02, coverage < 0.75 else { return nil }
+
+        let tile = ColorMath.hsb(from: background)
+        if tile.saturation > 0.35, tile.brightness > 0.3, logoSaturation / Double(kept) < 0.25 {
+            for index in stride(from: 0, to: output.count, by: 4) {
+                let alpha = Double(output[index + 3]) / 255
+                output[index] = byte(background.red * alpha)
+                output[index + 1] = byte(background.green * alpha)
+                output[index + 2] = byte(background.blue * alpha)
+            }
+        }
+
+        guard let provider = CGDataProvider(data: Data(output) as CFData),
+              let result = CGImage(
+                width: side, height: side, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: side * 4,
+                space: space, bitmapInfo: CGBitmapInfo(rawValue: bitmapInfo), provider: provider,
+                decode: nil, shouldInterpolate: true, intent: .defaultIntent
+              )
+        else { return nil }
+        return NSImage(cgImage: result, size: NSSize(width: side, height: side))
+    }
+
     /// True when some of the icon is see-through, i.e. it isn't a filled square.
     static func hasTransparentBackground(_ image: NSImage) -> Bool {
         (sample(image)?.coverage ?? 1) < 0.94

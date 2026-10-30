@@ -143,6 +143,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             { [weak self] in self?.showSettings(.webPages) },
             { [weak self] in self?.showSettings(.appearance) }
         ]
+        // Tell the CI script exactly when the timeline starts.
+        if let mark = ProcessInfo.processInfo.environment["MACNOTCH_DEMO_MARK"] {
+            try? String(Date().timeIntervalSince1970).write(toFile: mark, atomically: true, encoding: .utf8)
+        }
         for (index, action) in steps.enumerated() {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1 + Double(index) * 4) {
                 MainActor.assumeIsolated { action() }

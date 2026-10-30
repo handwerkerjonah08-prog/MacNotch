@@ -282,6 +282,44 @@ final class IslandViewModelTests: XCTestCase {
         XCTAssertFalse(ImageColor.hasTransparentBackground(icon(.systemBlue, filled: true)))
     }
 
+    func testTilesAreRemovedFromBehindLogos() throws {
+        func tile(_ background: NSColor, logo: NSColor) -> NSImage {
+            NSImage(size: NSSize(width: 128, height: 128), flipped: false) { rect in
+                background.setFill()
+                NSBezierPath(roundedRect: rect, xRadius: 20, yRadius: 20).fill()
+                logo.setFill()
+                NSBezierPath(ovalIn: rect.insetBy(dx: 36, dy: 36)).fill()
+                return true
+            }
+        }
+        // Orange tile, white logo: the tile goes and the logo turns orange.
+        let orange = try XCTUnwrap(ImageColor.removingBackground(tile(.systemOrange, logo: .white)))
+        XCTAssertTrue(ImageColor.hasTransparentBackground(orange))
+        XCTAssertFalse(ImageColor.isDarkMonochromeGlyph(orange))
+        XCTAssertEqual(SiteIcon(image: tile(.systemOrange, logo: .white)).invertsOnDark, false)
+
+        // Black tile, white logo (Roblox style): a white logo remains.
+        let black = try XCTUnwrap(ImageColor.removingBackground(tile(.black, logo: .white)))
+        XCTAssertTrue(ImageColor.hasTransparentBackground(black))
+        XCTAssertFalse(SiteIcon(image: tile(.black, logo: .white)).invertsOnDark)
+
+        // White tile, black logo: the black logo is inverted to show on dark glass.
+        XCTAssertTrue(SiteIcon(image: tile(.white, logo: .black)).invertsOnDark)
+
+        // Already transparent logos and busy pictures are left alone.
+        let transparent = NSImage(size: NSSize(width: 64, height: 64), flipped: false) { rect in
+            NSColor.systemRed.setFill()
+            NSBezierPath(ovalIn: rect).fill()
+            return true
+        }
+        XCTAssertNil(ImageColor.removingBackground(transparent))
+        let busy = NSImage(size: NSSize(width: 64, height: 64), flipped: false) { rect in
+            NSGradient(colors: [.systemRed, .systemGreen, .systemBlue])?.draw(in: rect, angle: 30)
+            return true
+        }
+        XCTAssertNil(ImageColor.removingBackground(busy))
+    }
+
     func testDistributedObserverReceivesBroadcasts() {
         let expectation = expectation(description: "notification")
         let name = "app.macnotch.tests.\(UUID().uuidString)"

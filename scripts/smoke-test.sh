@@ -1,6 +1,7 @@
 #!/bin/bash
 # Launches the packaged app in demo mode, screenshots each state and checks it never crashes.
-# The demo changes state at 1s, 5s, 9s ... so each shot lands 2 seconds into a step.
+# The demo changes state 1s, 5s, 9s ... after it starts (it writes that moment to build/demo-start),
+# so each shot lands 2 seconds into a step.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -13,9 +14,14 @@ echo "Reduce Transparency before: $(defaults read com.apple.universalaccess redu
 defaults write com.apple.universalaccess reduceTransparency -bool false 2>&1 || echo "could not change Reduce Transparency"
 echo "Reduce Transparency after: $(defaults read com.apple.universalaccess reduceTransparency 2>&1)"
 
-START=$(now)
-"$APP_BIN" --demo --reset > build/app.log 2>&1 &
+rm -f build/demo-start
+MACNOTCH_DEMO_MARK="$PWD/build/demo-start" "$APP_BIN" --demo --reset > build/app.log 2>&1 &
 PID=$!
+for _ in $(seq 1 100); do
+  [ -s build/demo-start ] && break
+  sleep 0.1
+done
+START=$(cat build/demo-start 2>/dev/null || now)
 
 shoot_at() {
   local target=$1 name=$2
@@ -30,8 +36,8 @@ shoot_at() {
   screencapture -x "build/screens/$name.png" 2>/dev/null || echo "screencapture unavailable for $name"
 }
 
-shoot_at 3  screen-01-compact
-shoot_at 7  screen-02-charging
+shoot_at 3 screen-01-compact
+shoot_at 7 screen-02-charging
 shoot_at 11 screen-03-notch-info
 shoot_at 15 screen-04-expanded-glass
 shoot_at 19 screen-05-edit-mode
