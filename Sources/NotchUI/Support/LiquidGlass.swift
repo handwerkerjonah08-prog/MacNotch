@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 enum LiquidGlass {
@@ -34,15 +35,34 @@ struct GlassFill<S: Shape>: View {
             Color.clear
                 .glassEffect(.regular.tint(Color.black.opacity(0.22 + 0.68 * tint)), in: shape)
         } else {
-            FallbackGlass(shape: shape, tint: tint)
+            BlurGlass(shape: shape, tint: tint)
         }
         #else
-        FallbackGlass(shape: shape, tint: tint)
+        BlurGlass(shape: shape, tint: tint)
         #endif
     }
 }
 
-/// Drawn glass for macOS 14-15 and for snapshot rendering.
+/// macOS 14-15: a behind-window blur pinned to its active look, since the island's window is never key.
+struct BlurGlass<S: Shape>: View {
+    let shape: S
+    let tint: Double
+
+    var body: some View {
+        ZStack {
+            VisualEffectBackground(material: .hudWindow)
+            Color(white: 0.04).opacity(0.25 + 0.55 * tint)
+            LinearGradient(
+                colors: [Color.white.opacity(0.10), Color.white.opacity(0.02), .clear],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        .clipShape(shape)
+    }
+}
+
+/// Drawn glass for snapshot rendering and the Settings previews.
 struct FallbackGlass<S: Shape>: View {
     let shape: S
     let tint: Double
@@ -111,5 +131,23 @@ extension View {
             self.buttonStyle(.bordered)
         }
         #endif
+    }
+}
+
+/// NSVisualEffectView forced into its active look, so it keeps blurring in a window that is never key.
+struct VisualEffectBackground: NSViewRepresentable {
+    var material: NSVisualEffectView.Material
+
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = material
+        view.blendingMode = .behindWindow
+        view.state = .active
+        view.isEmphasized = false
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {
+        view.material = material
     }
 }

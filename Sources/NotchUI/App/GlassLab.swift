@@ -72,24 +72,6 @@ private struct GlassLabView: View {
     }
 }
 
-/// NSVisualEffectView forced into its active look, so it keeps blurring in a window that is never key.
-struct VisualEffectBackground: NSViewRepresentable {
-    var material: NSVisualEffectView.Material
-
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        view.material = material
-        view.blendingMode = .behindWindow
-        view.state = .active
-        view.isEmphasized = false
-        return view
-    }
-
-    func updateNSView(_ view: NSVisualEffectView, context: Context) {
-        view.material = material
-    }
-}
-
 /// macOS 26's AppKit Liquid Glass view, looked up at run time so older SDKs still build.
 struct AppKitGlassBackground: NSViewRepresentable {
     var cornerRadius: CGFloat

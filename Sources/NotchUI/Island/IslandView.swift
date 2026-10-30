@@ -20,6 +20,8 @@ struct IslandRootView: View {
         .environmentObject(model.shelf)
         .environmentObject(model.favicons)
         .environment(\.colorScheme, .dark)
+        // The panel is never the key window; keep glass and controls in their active look anyway.
+        .environment(\.controlActiveState, .key)
     }
 }
 

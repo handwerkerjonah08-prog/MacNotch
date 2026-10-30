@@ -8,6 +8,11 @@ mkdir -p build/screens
 APP_BIN="build/MacNotch.app/Contents/MacOS/MacNotch"
 now() { python3 -c 'import time; print(time.time())'; }
 
+# CI Macs often run with Reduce Transparency on, which flattens all glass. Try to turn it off.
+echo "Reduce Transparency before: $(defaults read com.apple.universalaccess reduceTransparency 2>&1)"
+defaults write com.apple.universalaccess reduceTransparency -bool false 2>&1 || echo "could not change Reduce Transparency"
+echo "Reduce Transparency after: $(defaults read com.apple.universalaccess reduceTransparency 2>&1)"
+
 START=$(now)
 "$APP_BIN" --demo --reset > build/app.log 2>&1 &
 PID=$!
