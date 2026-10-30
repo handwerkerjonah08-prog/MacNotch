@@ -53,7 +53,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Publish preview build
-        if: success()
+        if: success() && !contains(github.event.head_commit.message, '[release]')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -71,6 +71,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="$(cat VERSION)"
+          gh release delete ci-preview --yes --cleanup-tag || true
           gh release delete "v$VERSION" --yes --cleanup-tag || true
           gh release create "v$VERSION" build/MacNotch.dmg \
             --title "MacNotch $VERSION" --notes-file RELEASE_NOTES.md --latest --target "$GITHUB_SHA"

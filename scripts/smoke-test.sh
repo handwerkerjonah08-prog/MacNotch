@@ -52,4 +52,37 @@ fi
 
 echo "--- app log ---"
 cat build/app.log
+
+echo "==> Pointer test: hover the notch, leave, then click the gear"
+swiftc -O scripts/mouse.swift -o build/mouse
+read -r SCREEN_W SCREEN_H < <(build/mouse screen)
+MID=$((SCREEN_W / 2))
+"$APP_BIN" --no-onboarding > build/app-pointer.log 2>&1 &
+PID=$!
+sleep 3
+build/mouse move "$MID" 400
+sleep 1
+build/mouse move "$MID" 4
+sleep 1.5
+screencapture -x build/screens/pointer-1-hover-open.png 2>/dev/null || true
+build/mouse move "$MID" 500
+sleep 1.5
+screencapture -x build/screens/pointer-2-moved-away.png 2>/dev/null || true
+build/mouse move "$MID" 4
+sleep 1.5
+# With the default widgets the island is 856 pt wide; the gear sits 43 pt in from its right edge.
+GEAR_X=$((MID + 856 / 2 - 43))
+build/mouse click "$GEAR_X" 15
+sleep 2.5
+screencapture -x build/screens/pointer-3-clicked-gear.png 2>/dev/null || true
+if kill -0 "$PID" 2>/dev/null; then
+  echo "MacNotch survived the pointer test"
+  kill "$PID"
+  wait "$PID" 2>/dev/null
+else
+  echo "::error::MacNotch exited during the pointer test"
+  cat build/app-pointer.log
+  exit 1
+fi
+cat build/app-pointer.log
 ls -la build/screens

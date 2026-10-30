@@ -62,7 +62,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if arguments.contains("--demo") {
             runDemo()
-        } else if !settings.settings.hasCompletedOnboarding {
+        } else if !settings.settings.hasCompletedOnboarding && !arguments.contains("--no-onboarding") {
             settings.settings.hasCompletedOnboarding = true
             showSettings(.general)
             island.previewExpanded(seconds: 4)
