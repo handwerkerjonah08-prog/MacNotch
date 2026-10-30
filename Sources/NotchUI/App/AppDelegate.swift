@@ -111,7 +111,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
-    /// Scripted tour used by CI to screenshot every state of the real app, one step every 4 seconds.
+    /// Scripted tour used by CI to screenshot every state of the real app, one step every 6 seconds.
     private func runDemo() {
         showDemoBackdrop()
         music.preview(track: DemoContent.track, state: .playing, artwork: DemoContent.artwork(), elapsed: 150)
@@ -157,7 +157,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let start = Date()
         for (index, action) in steps.enumerated() {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1 + Double(index) * 4) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1 + Double(index) * 6) {
                 MainActor.assumeIsolated {
                     action()
                     print(String(format: "demo step %d ran at %.2fs", index, Date().timeIntervalSince(start)))

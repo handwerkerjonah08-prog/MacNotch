@@ -1,7 +1,7 @@
 #!/bin/bash
 # Launches the packaged app in demo mode, screenshots each state and checks it never crashes.
-# The demo changes state 1s, 5s, 9s ... after it starts (it writes that moment to build/demo-start),
-# so each shot lands 2 seconds into a step.
+# The demo changes state 1s, 7s, 13s ... after it starts (it writes that moment to build/demo-start).
+# Each shot lands 3.5 seconds into a step, because CI Macs render Liquid Glass slowly in software.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -37,20 +37,20 @@ shoot_at() {
   python3 -c "import time; print('shot $name at %.2fs' % (time.time() - $START))"
 }
 
-shoot_at 3 screen-01-compact
-shoot_at 7 screen-02-charging
-shoot_at 11 screen-03-notch-info
-shoot_at 15 screen-04-expanded-glass
-shoot_at 19 screen-05-edit-mode
-shoot_at 23 screen-06-expanded-glass-clear
-shoot_at 27 screen-07-expanded-glass-tinted
-shoot_at 31 screen-08-expanded-glass-light-wallpaper
-shoot_at 35 screen-09-expanded-black-light-wallpaper
-shoot_at 40 screen-10-settings-notch
-shoot_at 43 screen-11-settings-notch-battery-date
-shoot_at 47 screen-12-settings-widgets
-shoot_at 51 screen-13-settings-web-pages
-shoot_at 55 screen-14-settings-appearance
+shoot_at 4.5 screen-01-compact
+shoot_at 10.5 screen-02-charging
+shoot_at 16.5 screen-03-notch-info
+shoot_at 22.5 screen-04-expanded-glass
+shoot_at 28.5 screen-05-edit-mode
+shoot_at 34.5 screen-06-expanded-glass-clear
+shoot_at 40.5 screen-07-expanded-glass-tinted
+shoot_at 46.5 screen-08-expanded-glass-light-wallpaper
+shoot_at 52.5 screen-09-expanded-black-light-wallpaper
+shoot_at 58.5 screen-10-settings-notch
+shoot_at 64.5 screen-11-settings-notch-battery-date
+shoot_at 70.5 screen-12-settings-widgets
+shoot_at 76.5 screen-13-settings-web-pages
+shoot_at 82.5 screen-14-settings-appearance
 
 if kill -0 "$PID" 2>/dev/null; then
   echo "MacNotch ran the full demo without crashing"
