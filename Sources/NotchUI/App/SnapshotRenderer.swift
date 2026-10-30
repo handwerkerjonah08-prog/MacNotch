@@ -95,8 +95,8 @@ public enum SnapshotRenderer {
         )
 
         // Let favicons download and Quick Look thumbnails finish.
-        spin(until: { favicons.images.count >= settings.settings.shortcuts.count && shelf.thumbnails.count >= demoFiles.count }, timeout: 12)
-        print("favicons loaded: \(favicons.images.count)/\(settings.settings.shortcuts.count), thumbnails: \(shelf.thumbnails.count)/\(demoFiles.count)")
+        spin(until: { favicons.icons.count >= settings.settings.shortcuts.count && shelf.thumbnails.count >= demoFiles.count }, timeout: 12)
+        print("favicons loaded: \(favicons.icons.count)/\(settings.settings.shortcuts.count), thumbnails: \(shelf.thumbnails.count)/\(demoFiles.count)")
 
         var failures = 0
         func render(_ name: String, _ inputs: IslandInputs, height: CGFloat = 260) {
@@ -137,14 +137,35 @@ public enum SnapshotRenderer {
         render("08-expanded-classic-black", IslandInputs(isPinnedOpen: true))
         settings.settings.islandMaterial = .liquidGlass
 
+        island.forceDragKind(.file)
         island.isDropTargeted = true
         render("09-expanded-drop-target", IslandInputs(isFileDragNearby: true))
         island.isDropTargeted = false
+        island.forceDragKind(.none)
 
         music.preview(track: nil, state: .stopped, artwork: nil, elapsed: 0)
         shelf.clear()
         weather.preview(nil)
         render("10-expanded-empty-states", IslandInputs(isPinnedOpen: true))
+
+        settings.settings.notchLeading = .weather
+        settings.settings.notchTrailing = .time
+        render("12-compact-notch-info", IslandInputs(showsInfo: true), height: 120)
+        settings.settings.notchLeading = .battery
+        settings.settings.notchTrailing = .date
+        render("13-compact-notch-battery-date", IslandInputs(showsInfo: true), height: 120)
+        settings.settings.notchLeading = .none
+        settings.settings.notchTrailing = .none
+
+        music.preview(track: DemoContent.track, state: .playing, artwork: DemoContent.artwork(), elapsed: 170)
+        render("14-edit-mode", IslandInputs(isEditing: true))
+        island.forceInputs(IslandInputs())
+
+        island.forceDragKind(.link)
+        island.isDropTargeted = true
+        render("15-link-drop", IslandInputs(isFileDragNearby: true))
+        island.isDropTargeted = false
+        island.forceDragKind(.none)
 
         settings.settings.widgets = [
             WidgetConfig(kind: .weather, isEnabled: true),

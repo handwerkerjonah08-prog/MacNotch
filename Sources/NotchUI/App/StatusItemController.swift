@@ -42,15 +42,23 @@ final class StatusItemController: NSObject {
     @objc private func openIslandAction() { openIsland() }
     @objc private func openSettingsAction() { openSettings() }
 
+    /// Apple's MacBook symbol when this macOS has it, otherwise a drawn MacBook with a notch.
     static let icon: NSImage = {
-        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
+        let configuration = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
+        for name in ["macbook.gen2", "macbook", "laptopcomputer"] {
+            if let symbol = NSImage(systemSymbolName: name, accessibilityDescription: "MacNotch")?
+                .withSymbolConfiguration(configuration) {
+                symbol.isTemplate = true
+                return symbol
+            }
+        }
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
             let screen = NSBezierPath(roundedRect: NSRect(x: 1.5, y: 3.5, width: 15, height: 11), xRadius: 2.2, yRadius: 2.2)
             screen.lineWidth = 1.4
             NSColor.black.setStroke()
             screen.stroke()
-            let notch = NSBezierPath(roundedRect: NSRect(x: 6, y: 11.5, width: 6, height: 3), xRadius: 1.4, yRadius: 1.4)
             NSColor.black.setFill()
-            notch.fill()
+            NSBezierPath(roundedRect: NSRect(x: 6, y: 11.5, width: 6, height: 3), xRadius: 1.4, yRadius: 1.4).fill()
             NSRect(x: 6, y: 13, width: 6, height: 1.5).fill()
             return true
         }

@@ -87,26 +87,53 @@ struct FallbackGlass<S: Shape>: View {
     }
 }
 
-/// Bright rim highlight that fades in toward the bottom edge (iOS 27 brightened specular edges).
+/// iOS 27 style glass edge: a brighter specular highlight that strengthens toward the bottom,
+/// with a soft second highlight catching the light along the upper sides.
 struct SpecularRim<S: Shape>: View {
     let shape: S
     /// Fraction of the height (from the top) that stays free of highlight, e.g. the notch band.
     let clearFraction: CGFloat
 
     var body: some View {
-        shape.stroke(
-            LinearGradient(
-                stops: [
-                    .init(color: .clear, location: 0),
-                    .init(color: .clear, location: clearFraction),
-                    .init(color: Color.white.opacity(0.10), location: min(1, clearFraction + 0.25)),
-                    .init(color: Color.white.opacity(0.32), location: 1)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            ),
-            lineWidth: 1.2
-        )
+        ZStack {
+            shape.stroke(
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: .clear, location: clearFraction),
+                        .init(color: Color.white.opacity(0.16), location: min(1, clearFraction + 0.2)),
+                        .init(color: Color.white.opacity(0.5), location: 1)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ),
+                lineWidth: 1.4
+            )
+            shape.stroke(
+                LinearGradient(
+                    colors: [Color.white.opacity(0.22), .clear, .clear, Color.white.opacity(0.14)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ),
+                lineWidth: 0.8
+            )
+            .mask(
+                LinearGradient(
+                    stops: [.init(color: .clear, location: clearFraction), .init(color: .black, location: min(1, clearFraction + 0.25))],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+        }
+    }
+}
+
+/// iOS 27 darkened outer edge, so glass separates cleanly from bright wallpapers.
+struct DarkenedEdge<S: Shape>: View {
+    let shape: S
+
+    var body: some View {
+        shape.stroke(Color.black.opacity(0.55), lineWidth: 1)
     }
 }
 

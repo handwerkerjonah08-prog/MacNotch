@@ -112,7 +112,8 @@ final class IslandMetricsTests: XCTestCase {
         let presentations: [IslandPresentation] = [
             .idle, .compactNowPlaying, .expanded,
             .alert(.charging(level: 1)), .alert(.pluggedIn(level: 1)), .alert(.unplugged(level: 1)),
-            .alert(.lowBattery(level: 1)), .alert(.shelfAdded(count: 1))
+            .alert(.lowBattery(level: 1)), .alert(.shelfAdded(count: 1)),
+            .alert(.shortcutAdded(name: "Figma")), .compactInfo
         ]
         for presentation in presentations {
             let s = size(presentation, shortcuts: 30)

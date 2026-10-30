@@ -105,13 +105,19 @@ final class IslandViewModelTests: XCTestCase {
         var settings = AppSettings.default
         settings.widgets = settings.widgets.map { WidgetConfig(kind: $0.kind, isEnabled: $0.kind != .fileShelf) }
         let model = makeModel(settings)
-        model.setFileDragNearby(true)
+        model.setDragNearby(.file)
         XCTAssertEqual(model.presentation, .idle)
+        XCTAssertEqual(model.dragKind, .none)
+        model.setDragNearby(.link)
+        XCTAssertEqual(model.presentation, .expanded, "links still go to Web Pages")
+        XCTAssertEqual(model.dragKind, .link)
+        model.setDragNearby(.none)
 
         let enabled = makeModel()
-        enabled.setFileDragNearby(true)
+        enabled.setDragNearby(.file)
         XCTAssertEqual(enabled.presentation, .expanded)
-        enabled.setFileDragNearby(false)
+        XCTAssertEqual(enabled.dragKind, .file)
+        enabled.setDragNearby(.none)
         XCTAssertEqual(enabled.presentation, .idle)
     }
 
@@ -160,11 +166,15 @@ final class IslandViewModelTests: XCTestCase {
             temperature: 54, apparentTemperature: nil, high: 61, low: 47, code: 2, isDay: true,
             humidity: nil, windSpeed: nil, unit: .fahrenheit, locationName: "Glencoe", fetchedAt: Date()
         ))
+        model.settings.settings.notchLeading = .weather
+        model.settings.settings.notchTrailing = .time
         let inputs: [IslandInputs] = [
             IslandInputs(),
             IslandInputs(nowPlayingActive: true),
             IslandInputs(alert: .charging(level: 50)),
-            IslandInputs(isPinnedOpen: true)
+            IslandInputs(alert: .shortcutAdded(name: "Figma")),
+            IslandInputs(isPinnedOpen: true),
+            IslandInputs(isEditing: true)
         ]
         for input in inputs {
             model.forceInputs(input)
@@ -175,6 +185,101 @@ final class IslandViewModelTests: XCTestCase {
             XCTAssertNotNil(image, "\(model.presentation)")
             XCTAssertEqual(image?.width, 1100)
         }
+    }
+
+    @MainActor
+    func testNotchInfoShowsWhenChosen() {
+        let model = makeModel()
+        XCTAssertEqual(model.presentation, .idle)
+        model.settings.settings.notchLeading = .weather
+        XCTAssertEqual(model.presentation, .compactInfo)
+        XCTAssertGreaterThan(model.islandSize.width, model.size(for: .idle).width)
+        model.settings.settings.notchLeading = .none
+        XCTAssertEqual(model.presentation, .idle)
+    }
+
+    @MainActor
+    func testEditModeRemovesAddsAndMovesWidgets() async {
+        var settings = AppSettings.default
+        settings.expandTrigger = .click
+        let model = makeModel(settings)
+        model.beginEditing()
+        XCTAssertTrue(model.isEditing)
+        XCTAssertEqual(model.presentation, .expanded)
+
+        // Leaving the island doesn't close it while editing.
+        model.mouseInsideChanged(true)
+        model.mouseInsideChanged(false)
+        await wait(0.6)
+        XCTAssertEqual(model.presentation, .expanded)
+
+        model.removeWidget(.weather)
+        XCTAssertEqual(model.settings.settings.enabledWidgetKinds, [.nowPlaying, .webPages, .fileShelf])
+        model.moveWidget(.fileShelf, toVisibleIndex: 0)
+        XCTAssertEqual(model.settings.settings.enabledWidgetKinds, [.fileShelf, .nowPlaying, .webPages])
+        model.addWidget(.weather)
+        XCTAssertEqual(model.settings.settings.enabledWidgetKinds.last, .weather)
+
+        let first = model.settings.settings.shortcuts[0]
+        model.moveShortcut(first.id, to: 2)
+        XCTAssertEqual(model.settings.settings.shortcuts[2].id, first.id)
+        model.removeShortcut(first.id)
+        XCTAssertFalse(model.settings.settings.shortcuts.contains { $0.id == first.id })
+
+        model.clickedOutside()
+        XCTAssertFalse(model.isEditing)
+        XCTAssertEqual(model.presentation, .idle)
+    }
+
+    @MainActor
+    func testDroppedLinkBecomesAWebPage() async throws {
+        let model = makeModel()
+        let before = model.settings.settings.shortcuts.count
+        let provider = NSItemProvider(object: NSURL(string: "https://www.figma.com/files")!)
+        XCTAssertTrue(model.handleDrop([provider]))
+        await wait(0.5)
+        XCTAssertEqual(model.settings.settings.shortcuts.count, before + 1)
+        XCTAssertEqual(model.settings.settings.shortcuts.last?.name, "Figma")
+        XCTAssertEqual(model.presentation, .alert(.shortcutAdded(name: "Figma")))
+
+        // The same link again is ignored.
+        XCTAssertTrue(model.handleDrop([NSItemProvider(object: NSURL(string: "https://figma.com/files/")!)]))
+        await wait(0.5)
+        XCTAssertEqual(model.settings.settings.shortcuts.count, before + 1)
+    }
+
+    func testDroppedURLsAreSortedIntoFilesAndLinks() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("drop-\(UUID().uuidString).txt")
+        try "x".write(to: file, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let providers = [
+            NSItemProvider(object: file as NSURL),
+            NSItemProvider(object: NSURL(string: "https://example.com/page")!),
+            NSItemProvider(object: NSURL(string: "mailto:someone@example.com")!)
+        ]
+        let dropped = await ShelfModel.droppedURLs(from: providers)
+        XCTAssertEqual(dropped.files.map(\.lastPathComponent), [file.lastPathComponent])
+        XCTAssertEqual(dropped.links.map(\.absoluteString), ["https://example.com/page"])
+    }
+
+    func testDarkLogosAreInvertedButColorfulOnesAreNot() {
+        func icon(_ color: NSColor, filled: Bool) -> NSImage {
+            NSImage(size: NSSize(width: 64, height: 64), flipped: false) { rect in
+                color.setFill()
+                if filled {
+                    rect.fill()
+                } else {
+                    NSBezierPath(ovalIn: rect.insetBy(dx: 10, dy: 10)).fill()
+                }
+                return true
+            }
+        }
+        XCTAssertTrue(ImageColor.isDarkMonochromeGlyph(icon(.black, filled: false)))
+        XCTAssertFalse(ImageColor.isDarkMonochromeGlyph(icon(.systemRed, filled: false)))
+        XCTAssertFalse(ImageColor.isDarkMonochromeGlyph(icon(.black, filled: true)), "filled squares keep their look")
+        XCTAssertFalse(ImageColor.isDarkMonochromeGlyph(icon(.white, filled: false)))
+        XCTAssertTrue(ImageColor.hasTransparentBackground(icon(.systemBlue, filled: false)))
+        XCTAssertFalse(ImageColor.hasTransparentBackground(icon(.systemBlue, filled: true)))
     }
 
     func testDistributedObserverReceivesBroadcasts() {

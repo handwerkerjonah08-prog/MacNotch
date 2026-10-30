@@ -105,35 +105,43 @@ struct ArtworkView: View {
 
 // MARK: - Site icon
 
+/// A saved site's icon, drawn on its own with no tile behind it.
 struct SiteIconView: View {
     var shortcut: WebShortcut
-    var image: NSImage?
+    var icon: SiteIcon?
     var size: CGFloat
 
     var body: some View {
-        ZStack {
-            if let image {
-                RoundedRectangle(cornerRadius: size * 0.26, style: .continuous)
-                    .fill(Color.white.opacity(0.94))
-                Image(nsImage: image)
+        Group {
+            if let icon {
+                Image(nsImage: icon.image)
                     .resizable()
                     .interpolation(.high)
                     .aspectRatio(contentMode: .fit)
-                    .padding(size * 0.16)
+                    .modifier(InvertIf(active: icon.invertsOnDark))
+                    .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
+                    .shadow(color: .black.opacity(0.3), radius: 3, y: 1.5)
             } else {
-                RoundedRectangle(cornerRadius: size * 0.26, style: .continuous)
-                    .fill(Color.seeded(shortcut.host).gradient)
                 Text(shortcut.monogram)
-                    .font(.system(size: size * 0.46, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .font(.system(size: size * 0.62, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.seeded(shortcut.host).gradient)
+                    .shadow(color: .black.opacity(0.3), radius: 3, y: 1.5)
             }
         }
         .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: size * 0.26, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: size * 0.26, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5)
-        )
+    }
+}
+
+private struct InvertIf: ViewModifier {
+    let active: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if active {
+            content.colorInvert()
+        } else {
+            content
+        }
     }
 }
 
@@ -213,14 +221,24 @@ private struct IslandButtonBody: View {
 
 /// Capsule button used inside cards ("Open Music", "Add Sites").
 struct CapsuleButtonStyle: ButtonStyle {
+    var prominent = false
+
     func makeBody(configuration: Configuration) -> some View {
-        CapsuleButtonBody(configuration: configuration)
+        CapsuleButtonBody(configuration: configuration, prominent: prominent)
     }
 }
 
 private struct CapsuleButtonBody: View {
     let configuration: ButtonStyleConfiguration
+    let prominent: Bool
     @State private var isHovering = false
+
+    private var fill: Color {
+        if prominent {
+            return Theme.blue.opacity(configuration.isPressed ? 0.75 : (isHovering ? 1 : 0.9))
+        }
+        return Color.white.opacity(configuration.isPressed ? 0.28 : (isHovering ? 0.2 : 0.13))
+    }
 
     var body: some View {
         configuration.label
@@ -228,10 +246,7 @@ private struct CapsuleButtonBody: View {
             .foregroundStyle(Color.white)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(Color.white.opacity(configuration.isPressed ? 0.28 : (isHovering ? 0.2 : 0.13)))
-            )
+            .background(Capsule(style: .continuous).fill(fill))
             .overlay(Capsule(style: .continuous).strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5))
             .scaleEffect(configuration.isPressed ? 0.95 : 1)
             .onHover { isHovering = $0 }
@@ -270,11 +285,11 @@ struct WidgetCard<Content: View, Background: View>: View {
                 RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
                     .strokeBorder(
                         LinearGradient(
-                            colors: [Color.white.opacity(0.16), Theme.cardStroke, Color.white.opacity(0.05)],
+                            colors: [Color.white.opacity(0.26), Theme.cardStroke, Color.white.opacity(0.04), Color.white.opacity(0.12)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
-                        lineWidth: 0.75
+                        lineWidth: 0.8
                     )
             )
     }

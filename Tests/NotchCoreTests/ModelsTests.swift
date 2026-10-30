@@ -139,8 +139,9 @@ final class URLNormalizerTests: XCTestCase {
 
     func testFaviconCandidatesOrder() {
         let candidates = URLNormalizer.faviconCandidates(for: URL(string: "https://www.discord.com/app")!)
-        XCTAssertEqual(candidates.first?.absoluteString, "https://www.discord.com/apple-touch-icon.png")
-        XCTAssertTrue(candidates[1].absoluteString.contains("domain=discord.com"))
+        XCTAssertTrue(candidates[0].absoluteString.contains("domain=discord.com"))
+        XCTAssertTrue(candidates[1].absoluteString.contains("duckduckgo.com/ip3/discord.com"))
+        XCTAssertEqual(candidates.last?.absoluteString, "https://www.discord.com/apple-touch-icon.png")
         XCTAssertEqual(candidates.count, 3)
     }
 }

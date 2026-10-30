@@ -46,13 +46,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         windowController = NotchWindowController(model: island)
         settingsWindow = SettingsWindowController(
-            settings: settings, weather: weather, shelf: shelf, favicons: favicons, island: island
+            settings: settings, weather: weather, shelf: shelf, favicons: favicons, battery: battery, island: island
         )
         statusItem = StatusItemController(
             openIsland: { [weak self] in self?.island.previewExpanded(seconds: 6) },
             openSettings: { [weak self] in self?.showSettings(nil) }
         )
         island.openSettingsHandler = { [weak self] pane in self?.showSettings(pane) }
+        island.addWebPageHandler = { [weak self] in self?.settingsWindow.showAddWebPage() }
 
         settings.$settings
             .map(\.showMenuBarIcon)
@@ -109,8 +110,17 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         let steps: [() -> Void] = [
             { [weak self] in self?.island.forceInputs(IslandInputs(nowPlayingActive: true)) },
             { [weak self] in self?.island.forceInputs(IslandInputs(nowPlayingActive: true, alert: .charging(level: 82))) },
+            { [weak self] in
+                self?.settings.settings.notchLeading = .weather
+                self?.settings.settings.notchTrailing = .time
+                self?.island.forceInputs(IslandInputs())
+            },
             { [weak self] in self?.island.forceInputs(IslandInputs(isPinnedOpen: true, nowPlayingActive: true)) },
-            { [weak self] in self?.settings.settings.glassTint = 0 },
+            { [weak self] in self?.island.forceInputs(IslandInputs(nowPlayingActive: true, isEditing: true)) },
+            { [weak self] in
+                self?.island.forceInputs(IslandInputs(isPinnedOpen: true, nowPlayingActive: true))
+                self?.settings.settings.glassTint = 0
+            },
             { [weak self] in self?.settings.settings.glassTint = 1 },
             { [weak self] in
                 self?.settings.settings.glassTint = AppSettings.default.glassTint
@@ -119,9 +129,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             { [weak self] in self?.settings.settings.islandMaterial = .black },
             { [weak self] in
                 self?.settings.settings.islandMaterial = .liquidGlass
+                self?.settings.settings.notchLeading = .none
+                self?.settings.settings.notchTrailing = .none
                 self?.setDemoBackdrop(light: false)
                 self?.island.forceInputs(IslandInputs())
-                self?.showSettings(.general)
+                self?.showSettings(.notch)
+            },
+            { [weak self] in
+                self?.settings.settings.notchLeading = .battery
+                self?.settings.settings.notchTrailing = .date
             },
             { [weak self] in self?.showSettings(.widgets) },
             { [weak self] in self?.showSettings(.webPages) },

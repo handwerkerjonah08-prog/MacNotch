@@ -62,10 +62,6 @@ final class SettingsModel: ObservableObject {
         settings.shortcuts.move(fromOffsets: source, toOffset: destination)
     }
 
-    func hasShortcut(for url: URL) -> Bool {
-        let host = WebShortcut(name: "", url: url).host
-        return settings.shortcuts.contains { $0.host == host && $0.url.path == url.path }
-    }
 }
 
 enum LaunchAtLogin {

@@ -3,6 +3,15 @@ import Combine
 import NotchCore
 import SwiftUI
 
+/// What is being dragged toward the notch.
+enum DragKind: Equatable {
+    case none
+    /// Files from Finder, headed for the shelf.
+    case file
+    /// A web link (for example from Safari's address bar), saved as a web page.
+    case link
+}
+
 /// Owns the island's state. Inputs (hover, music, power, drags) go in; a presentation comes out.
 @MainActor
 final class IslandViewModel: ObservableObject {
@@ -10,6 +19,8 @@ final class IslandViewModel: ObservableObject {
     @Published private(set) var notch: NotchGeometry
     @Published private(set) var maxWidth: CGFloat
     @Published private(set) var isMouseInside = false
+    @Published private(set) var isEditing = false
+    @Published private(set) var dragKind: DragKind = .none
     @Published var isDropTargeted = false
 
     let settings: SettingsModel
@@ -65,12 +76,15 @@ final class IslandViewModel: ObservableObject {
     var islandSize: CGSize { size(for: presentation) }
 
     func size(for presentation: IslandPresentation) -> CGSize {
-        IslandMetrics.size(
+        let current = settings.settings
+        return IslandMetrics.size(
             for: presentation,
             notch: notch.size,
-            widgets: settings.settings.enabledWidgetKinds,
-            shortcutCount: settings.settings.shortcuts.count,
-            maxWidth: maxWidth
+            widgets: current.enabledWidgetKinds,
+            shortcutCount: current.shortcuts.count,
+            maxWidth: maxWidth,
+            leading: current.notchLeading,
+            trailing: current.notchTrailing
         )
     }
 
@@ -79,6 +93,7 @@ final class IslandViewModel: ObservableObject {
     }
 
     var acceptsFileDrops: Bool { settings.settings.isEnabled(.fileShelf) }
+    var acceptsLinkDrops: Bool { settings.settings.isEnabled(.webPages) }
 
     func updateGeometry(_ geometry: NotchGeometry, maxWidth: CGFloat) {
         notch = geometry
@@ -117,6 +132,7 @@ final class IslandViewModel: ObservableObject {
     }
 
     func clickedOutside() {
+        endEditing()
         inputs.isPinnedOpen = false
         if !isMouseInside {
             inputs.isHovering = false
@@ -130,26 +146,48 @@ final class IslandViewModel: ObservableObject {
         inputs.isHovering = false
     }
 
-    // MARK: File drags
+    // MARK: Drags onto the notch
 
-    func setFileDragNearby(_ nearby: Bool) {
-        guard acceptsFileDrops || !nearby else { return }
-        inputs.isFileDragNearby = nearby
-        if !nearby {
+    /// Called while something is dragged near the notch, or with `.none` when the drag ends or moves away.
+    func setDragNearby(_ kind: DragKind) {
+        let accepted: DragKind
+        switch kind {
+        case .file: accepted = acceptsFileDrops ? .file : .none
+        case .link: accepted = acceptsLinkDrops ? .link : .none
+        case .none: accepted = .none
+        }
+        if dragKind != accepted {
+            dragKind = accepted
+        }
+        inputs.isFileDragNearby = accepted != .none
+        if accepted == .none {
             isDropTargeted = false
         }
     }
 
+    /// Files go on the shelf; web links become saved web pages.
     func handleDrop(_ providers: [NSItemProvider]) -> Bool {
-        guard acceptsFileDrops else { return false }
+        guard acceptsFileDrops || acceptsLinkDrops else { return false }
         Task { [weak self] in
-            let urls = await ShelfModel.fileURLs(from: providers)
+            let dropped = await ShelfModel.droppedURLs(from: providers)
             guard let self else { return }
-            let added = self.shelf.add(urls)
+            var alert: AlertKind?
+            if self.acceptsFileDrops, !dropped.files.isEmpty {
+                let added = self.shelf.add(dropped.files)
+                if added > 0 { alert = .shelfAdded(count: added) }
+            }
+            if self.acceptsLinkDrops {
+                for link in dropped.links {
+                    if let saved = self.settings.settings.addShortcut(for: link) {
+                        self.favicons.load(saved)
+                        alert = .shortcutAdded(name: saved.name)
+                    }
+                }
+            }
             self.isDropTargeted = false
-            self.inputs.isFileDragNearby = false
-            if added > 0 {
-                self.showAlert(.shelfAdded(count: added))
+            self.setDragNearby(.none)
+            if let alert {
+                self.showAlert(alert)
             }
         }
         return true
@@ -177,8 +215,57 @@ final class IslandViewModel: ObservableObject {
     // MARK: Actions
 
     func openSettings(_ pane: SettingsPane? = nil) {
+        endEditing()
         collapse()
         openSettingsHandler?(pane)
+    }
+
+    /// Opens Settings straight to the Add Web Page sheet.
+    var addWebPageHandler: (() -> Void)?
+
+    func addWebPage() {
+        endEditing()
+        collapse()
+        addWebPageHandler?()
+    }
+
+    // MARK: Edit mode (iPhone-style wiggle)
+
+    func beginEditing() {
+        guard !isEditing else { return }
+        withAnimation(Theme.openSpring) { isEditing = true }
+        inputs.isEditing = true
+        if settings.settings.hapticsEnabled {
+            NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
+        }
+    }
+
+    func endEditing() {
+        guard isEditing else { return }
+        withAnimation(Theme.openSpring) { isEditing = false }
+        inputs.isEditing = false
+    }
+
+    func removeWidget(_ kind: WidgetKind) {
+        withAnimation(Theme.openSpring) { settings.settings.setWidget(kind, enabled: false) }
+    }
+
+    func addWidget(_ kind: WidgetKind) {
+        withAnimation(Theme.openSpring) { settings.settings.setWidget(kind, enabled: true) }
+    }
+
+    func moveWidget(_ kind: WidgetKind, toVisibleIndex index: Int) {
+        guard settings.settings.enabledWidgetKinds.firstIndex(of: kind) != index else { return }
+        withAnimation(Theme.openSpring) { settings.settings.moveEnabledWidget(kind, toEnabledIndex: index) }
+    }
+
+    func removeShortcut(_ id: UUID) {
+        withAnimation(Theme.openSpring) { settings.settings.removeShortcut(id: id) }
+    }
+
+    func moveShortcut(_ id: UUID, to index: Int) {
+        guard settings.settings.shortcuts.firstIndex(where: { $0.id == id }) != index else { return }
+        withAnimation(Theme.openSpring) { settings.settings.moveShortcut(id: id, to: index) }
     }
 
     func open(_ shortcut: WebShortcut) {
@@ -211,7 +298,16 @@ final class IslandViewModel: ObservableObject {
     func forceInputs(_ inputs: IslandInputs) {
         var copy = inputs
         copy.trigger = settings.settings.expandTrigger
+        copy.showsInfo = copy.showsInfo || settings.settings.showsNotchInfo
+        if copy.isEditing != isEditing {
+            withAnimation(Theme.openSpring) { isEditing = copy.isEditing }
+        }
         self.inputs = copy
+    }
+
+    /// Sets what a drag is carrying without the window controller. Snapshots and tests only.
+    func forceDragKind(_ kind: DragKind) {
+        dragKind = kind
     }
 
     // MARK: Bindings
@@ -236,12 +332,15 @@ final class IslandViewModel: ObservableObject {
 
     private func settingsChanged(_ newSettings: AppSettings) {
         inputs.trigger = newSettings.expandTrigger
+        inputs.showsInfo = newSettings.showsNotchInfo
         if !newSettings.showNowPlayingActivity {
             inputs.nowPlayingActive = false
         } else if music.state == .playing {
             inputs.nowPlayingActive = true
         }
-        if !newSettings.isEnabled(.fileShelf) {
+        if (dragKind == .file && !newSettings.isEnabled(.fileShelf))
+            || (dragKind == .link && !newSettings.isEnabled(.webPages)) {
+            dragKind = .none
             inputs.isFileDragNearby = false
         }
         weather.configure(location: newSettings.weatherLocation, unit: newSettings.temperatureUnit)

@@ -5,6 +5,7 @@ import SwiftUI
 struct WebPagesPane: View {
     @EnvironmentObject private var model: SettingsModel
     @EnvironmentObject private var favicons: FaviconCache
+    @EnvironmentObject private var router: SettingsRouter
     @State private var editing: WebShortcut?
     @State private var isAdding = false
 
@@ -22,7 +23,7 @@ struct WebPagesPane: View {
                 ForEach(model.settings.shortcuts) { shortcut in
                     ShortcutRow(
                         shortcut: shortcut,
-                        icon: favicons.image(for: shortcut),
+                        icon: favicons.icon(for: shortcut),
                         edit: { editing = shortcut },
                         remove: { withAnimation { model.removeShortcut(id: shortcut.id) } }
                     )
@@ -38,13 +39,13 @@ struct WebPagesPane: View {
             } header: {
                 Text("Your Web Pages")
             } footer: {
-                Text("Drag rows to reorder. You can also right-click an icon in the island to remove it.")
+                Text("Drag rows to reorder. In the island you can also drag a link from your browser onto the notch to save it, or click the grid button to rearrange and remove icons.")
             }
 
             Section("Suggestions") {
                 let available = WebShortcutPreset.all.filter { preset in
                     guard let candidate = preset.shortcut else { return false }
-                    return !model.hasShortcut(for: candidate.url)
+                    return !model.settings.containsShortcut(for: candidate.url)
                 }
                 if available.isEmpty {
                     Text("You've added every suggestion.").foregroundStyle(.secondary)
@@ -80,19 +81,30 @@ struct WebPagesPane: View {
                 favicons.load(updated)
             }
         }
-        .onAppear { favicons.load(model.settings.shortcuts) }
+        .onAppear {
+            favicons.load(model.settings.shortcuts)
+            consumeAddRequest()
+        }
+        .onChange(of: router.wantsAddWebPage) { _, _ in consumeAddRequest() }
+    }
+
+    /// The island's + button opens Settings straight to the Add Web Page sheet.
+    private func consumeAddRequest() {
+        guard router.wantsAddWebPage else { return }
+        router.wantsAddWebPage = false
+        isAdding = true
     }
 }
 
 private struct ShortcutRow: View {
     let shortcut: WebShortcut
-    let icon: NSImage?
+    let icon: SiteIcon?
     let edit: () -> Void
     let remove: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
-            SiteIconView(shortcut: shortcut, image: icon, size: 30)
+            SiteIconView(shortcut: shortcut, icon: icon, size: 28)
             VStack(alignment: .leading, spacing: 1) {
                 Text(shortcut.name)
                 Text(shortcut.url.absoluteString)

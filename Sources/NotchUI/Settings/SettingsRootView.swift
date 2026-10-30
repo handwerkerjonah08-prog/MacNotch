@@ -35,6 +35,7 @@ struct SettingsRootView: View {
     private func detail(for pane: SettingsPane) -> some View {
         switch pane {
         case .general: GeneralPane(island: island)
+        case .notch: NotchPane()
         case .appearance: AppearancePane(island: island)
         case .widgets: WidgetsPane()
         case .webPages: WebPagesPane()

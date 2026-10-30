@@ -67,20 +67,21 @@ public enum URLNormalizer {
         return first.uppercased() + candidate.dropFirst()
     }
 
-    /// Icon sources, best first. The apple-touch-icon is the high resolution square app icon most sites ship.
+    /// Icon sources, in the order they're tried. Site favicons usually have transparent backgrounds,
+    /// so they come first; the apple-touch-icon (a filled square) is the last resort.
     public static func faviconCandidates(for url: URL) -> [URL] {
         guard let host = url.host, let scheme = url.scheme else { return [] }
-        var result: [URL] = []
-        if let touch = URL(string: "\(scheme)://\(host)/apple-touch-icon.png") {
-            result.append(touch)
-        }
         var bareHost = host.lowercased()
         if bareHost.hasPrefix("www.") { bareHost = String(bareHost.dropFirst(4)) }
+        var result: [URL] = []
         if let google = URL(string: "https://www.google.com/s2/favicons?domain=\(bareHost)&sz=128") {
             result.append(google)
         }
         if let duck = URL(string: "https://icons.duckduckgo.com/ip3/\(bareHost).ico") {
             result.append(duck)
+        }
+        if let touch = URL(string: "\(scheme)://\(host)/apple-touch-icon.png") {
+            result.append(touch)
         }
         return result
     }

@@ -3,13 +3,14 @@ import NotchCore
 import SwiftUI
 
 enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
-    case general, appearance, widgets, webPages, weather, shelf, about
+    case general, notch, appearance, widgets, webPages, weather, shelf, about
 
     var id: SettingsPane { self }
 
     var title: String {
         switch self {
         case .general: return "General"
+        case .notch: return "Notch"
         case .appearance: return "Appearance"
         case .widgets: return "Widgets"
         case .webPages: return "Web Pages"
@@ -22,6 +23,7 @@ enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
     var symbol: String {
         switch self {
         case .general: return "gearshape.fill"
+        case .notch: return "rectangle.topthird.inset.filled"
         case .appearance: return "paintbrush.fill"
         case .widgets: return "square.grid.2x2.fill"
         case .webPages: return "globe"
@@ -33,13 +35,14 @@ enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
 
     var color: Color {
         switch self {
-        case .general: return Color(white: 0.55)
-        case .appearance: return Color(red: 0.36, green: 0.42, blue: 0.95)
-        case .widgets: return Color(red: 0.2, green: 0.55, blue: 1)
-        case .webPages: return Color(red: 0.35, green: 0.35, blue: 0.85)
-        case .weather: return Color(red: 0.2, green: 0.7, blue: 0.95)
-        case .shelf: return Color(red: 1, green: 0.6, blue: 0.1)
-        case .about: return Color(white: 0.5)
+        case .general: return Color(nsColor: .systemGray)
+        case .notch: return Color(nsColor: .systemPurple)
+        case .appearance: return Color(nsColor: .systemIndigo)
+        case .widgets: return Color(nsColor: .systemBlue)
+        case .webPages: return Color(nsColor: .systemTeal)
+        case .weather: return Color(nsColor: .systemCyan)
+        case .shelf: return Color(nsColor: .systemOrange)
+        case .about: return Color(nsColor: .systemGray)
         }
     }
 }
@@ -48,6 +51,8 @@ enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
 @MainActor
 final class SettingsRouter: ObservableObject {
     @Published var selection: SettingsPane? = .general
+    /// Set by the island's + button; the Web Pages pane opens its Add sheet and clears it.
+    @Published var wantsAddWebPage = false
 }
 
 @MainActor
@@ -58,15 +63,25 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     private let weather: WeatherService
     private let shelf: ShelfModel
     private let favicons: FaviconCache
+    private let battery: BatteryMonitor
     private let island: IslandViewModel
 
-    init(settings: SettingsModel, weather: WeatherService, shelf: ShelfModel, favicons: FaviconCache, island: IslandViewModel) {
+    init(
+        settings: SettingsModel, weather: WeatherService, shelf: ShelfModel,
+        favicons: FaviconCache, battery: BatteryMonitor, island: IslandViewModel
+    ) {
         self.settings = settings
         self.weather = weather
         self.shelf = shelf
         self.favicons = favicons
+        self.battery = battery
         self.island = island
         super.init()
+    }
+
+    func showAddWebPage() {
+        router.wantsAddWebPage = true
+        show(.webPages)
     }
 
     var isVisible: Bool { window?.isVisible ?? false }
@@ -95,6 +110,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             .environmentObject(weather)
             .environmentObject(shelf)
             .environmentObject(favicons)
+            .environmentObject(battery)
+            .environmentObject(router)
 
         let controller = NSHostingController(rootView: root)
         controller.sizingOptions = []

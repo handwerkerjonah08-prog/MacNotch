@@ -7,10 +7,11 @@ struct ShelfCard: View {
     @EnvironmentObject private var shelf: ShelfModel
 
     var body: some View {
-        let targeted = model.isDropTargeted
+        let fileDrag = model.dragKind == .file
+        let targeted = fileDrag && model.isDropTargeted
         WidgetCard(width: IslandMetrics.cardWidth(for: .fileShelf, shortcutCount: 0)) {
             if targeted {
-                Color.accentColor.opacity(0.18)
+                Theme.blue.opacity(0.18)
             }
         } content: {
             VStack(alignment: .leading, spacing: 8) {
@@ -36,7 +37,7 @@ struct ShelfCard: View {
                     }
                 }
 
-                if shelf.items.isEmpty || targeted {
+                if shelf.items.isEmpty || fileDrag {
                     dropZone(targeted: targeted)
                 } else {
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -70,7 +71,7 @@ struct ShelfCard: View {
         VStack(spacing: 6) {
             Image(systemName: targeted ? "tray.and.arrow.down.fill" : "tray.and.arrow.down")
                 .font(.system(size: 22, weight: .medium))
-                .foregroundStyle(targeted ? Color.accentColor : Theme.secondary)
+                .foregroundStyle(targeted ? Theme.blue : Theme.secondary)
                 .symbolEffect(.bounce, value: targeted)
             Text(targeted ? "Drop to add" : "Drop files here")
                 .font(.system(size: 11, weight: .semibold))
@@ -80,7 +81,7 @@ struct ShelfCard: View {
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(
-                    targeted ? Color.accentColor : Color.white.opacity(0.22),
+                    targeted ? Theme.blue : Color.white.opacity(0.22),
                     style: StrokeStyle(lineWidth: 1.2, dash: [5, 4])
                 )
         )

@@ -82,7 +82,7 @@ public enum IslandMetrics {
     public static func radii(for presentation: IslandPresentation) -> CornerRadii {
         switch presentation {
         case .idle: return CornerRadii(top: 6, bottom: 10)
-        case .compactNowPlaying: return CornerRadii(top: 6, bottom: 13)
+        case .compactInfo, .compactNowPlaying: return CornerRadii(top: 6, bottom: 13)
         case .alert: return CornerRadii(top: 6, bottom: 14)
         case .expanded: return CornerRadii(top: 14, bottom: 32)
         }
@@ -122,7 +122,24 @@ public enum IslandMetrics {
         case .unplugged: return 112
         case .lowBattery: return 118
         case .shelfAdded: return 120
+        case .shortcutAdded: return 120
         }
+    }
+
+    public static func infoWidth(for slot: NotchSlot) -> CGFloat {
+        switch slot {
+        case .none: return 0
+        case .weather: return 64
+        case .battery: return 70
+        case .time: return 58
+        case .date: return 66
+        case .shelf: return 48
+        }
+    }
+
+    /// Both wings share a width so the island stays centered on the notch.
+    public static func infoWingWidth(leading: NotchSlot, trailing: NotchSlot) -> CGFloat {
+        max(34, infoWidth(for: leading), infoWidth(for: trailing))
     }
 
     /// Full frame of the island shape including its top flares.
@@ -131,13 +148,18 @@ public enum IslandMetrics {
         notch: CGSize,
         widgets: [WidgetKind],
         shortcutCount: Int,
-        maxWidth: CGFloat
+        maxWidth: CGFloat,
+        leading: NotchSlot = .none,
+        trailing: NotchSlot = .none
     ) -> CGSize {
         let flare = radii(for: presentation).top * 2
         let size: CGSize
         switch presentation {
         case .idle:
             size = CGSize(width: notch.width + flare, height: notch.height)
+        case .compactInfo:
+            let wing = infoWingWidth(leading: leading, trailing: trailing)
+            size = CGSize(width: notch.width + wing * 2 + flare, height: notch.height)
         case .compactNowPlaying:
             size = CGSize(width: notch.width + compactWingWidth(notch: notch) * 2 + flare, height: notch.height)
         case .alert(let alert):

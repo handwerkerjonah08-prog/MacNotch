@@ -53,6 +53,12 @@ struct IslandView: View {
         }
         .frame(width: size.width, height: size.height)
         .clipShape(shape)
+        .overlay {
+            if useGlass {
+                DarkenedEdge(shape: shape)
+                    .transition(.opacity)
+            }
+        }
         .contentShape(shape)
         .shadow(
             color: Color.black.opacity(presentation.isExpanded ? 0.45 : 0),
@@ -74,6 +80,9 @@ struct IslandView: View {
         switch presentation {
         case .idle:
             Color.clear
+        case .compactInfo:
+            CompactInfoView(notch: notch)
+                .transition(.islandContent)
         case .compactNowPlaying:
             CompactNowPlayingView(notch: notch)
                 .transition(.islandContent)
@@ -97,10 +106,11 @@ private struct IslandInteractions: ViewModifier {
     func body(content: Content) -> some View {
         if enabled {
             content
-                .onDrop(of: [.fileURL], isTargeted: $model.isDropTargeted) { providers in
+                .onDrop(of: [.fileURL, .url], isTargeted: $model.isDropTargeted) { providers in
                     model.handleDrop(providers)
                 }
                 .contextMenu {
+                    Button("Edit Widgets") { model.beginEditing() }
                     Button("Settings…") { model.openSettings() }
                     Divider()
                     Button("Quit MacNotch") { NSApp.terminate(nil) }
@@ -194,6 +204,74 @@ struct CompactNowPlayingView: View {
     }
 }
 
+/// Whatever the user picked to sit either side of the notch.
+struct CompactInfoView: View {
+    let notch: CGSize
+    @EnvironmentObject private var settings: SettingsModel
+
+    var body: some View {
+        let current = settings.settings
+        CompactLayout(notch: notch, wing: IslandMetrics.infoWingWidth(leading: current.notchLeading, trailing: current.notchTrailing)) {
+            NotchSlotView(slot: current.notchLeading)
+                .padding(.leading, 10)
+        } trailing: {
+            NotchSlotView(slot: current.notchTrailing)
+                .padding(.trailing, 10)
+        }
+    }
+}
+
+struct NotchSlotView: View {
+    let slot: NotchSlot
+    @EnvironmentObject private var weather: WeatherService
+    @EnvironmentObject private var battery: BatteryMonitor
+    @EnvironmentObject private var shelf: ShelfModel
+
+    var body: some View {
+        HStack(spacing: 5) {
+            switch slot {
+            case .none:
+                EmptyView()
+            case .weather:
+                if let snapshot = weather.snapshot {
+                    Image(systemName: snapshot.condition.symbolName)
+                        .symbolRenderingMode(.multicolor)
+                        .font(.system(size: 12))
+                    Text(snapshot.temperatureText)
+                        .contentTransition(.numericText())
+                } else {
+                    Image(systemName: "cloud.fill").font(.system(size: 12))
+                }
+            case .battery:
+                if let power = battery.snapshot {
+                    Text("\(power.level)%")
+                    BatteryGlyph(level: power.level, color: Theme.batteryColor(level: power.level, charging: power.isCharging), width: 22, height: 11)
+                } else {
+                    Image(systemName: "powerplug.fill").font(.system(size: 11))
+                }
+            case .time:
+                TimelineView(.everyMinute) { context in
+                    Text(context.date, format: .dateTime.hour().minute())
+                }
+            case .date:
+                TimelineView(.everyMinute) { context in
+                    Text(context.date, format: .dateTime.weekday(.abbreviated).day())
+                }
+            case .shelf:
+                Image(systemName: shelf.items.isEmpty ? "tray" : "tray.full.fill")
+                    .font(.system(size: 12))
+                if !shelf.items.isEmpty {
+                    Text("\(shelf.items.count)")
+                }
+            }
+        }
+        .font(.system(size: 13, weight: .semibold).monospacedDigit())
+        .foregroundStyle(.white)
+        .lineLimit(1)
+        .fixedSize()
+    }
+}
+
 struct AlertActivityView: View {
     let alert: AlertKind
     let notch: CGSize
@@ -231,7 +309,7 @@ struct AlertActivityView: View {
         switch alert {
         case .charging(let level), .pluggedIn(let level), .unplugged(let level), .lowBattery(let level):
             return level
-        case .shelfAdded:
+        case .shelfAdded, .shortcutAdded:
             return nil
         }
     }
@@ -242,6 +320,7 @@ struct AlertActivityView: View {
         case .unplugged: return "powerplug.fill"
         case .lowBattery: return "exclamationmark.triangle.fill"
         case .shelfAdded: return "tray.and.arrow.down.fill"
+        case .shortcutAdded: return "globe"
         }
     }
 
@@ -252,6 +331,7 @@ struct AlertActivityView: View {
         case .unplugged: return "On Battery"
         case .lowBattery: return "Low Battery"
         case .shelfAdded: return "Added to Shelf"
+        case .shortcutAdded: return "Saved"
         }
     }
 
@@ -261,15 +341,17 @@ struct AlertActivityView: View {
             return "\(level)%"
         case .shelfAdded(let count):
             return count == 1 ? "1 file" : "\(count) files"
+        case .shortcutAdded(let name):
+            return name.count > 14 ? String(name.prefix(13)) + "…" : name
         }
     }
 
     private var tint: Color {
         switch alert {
-        case .charging: return Color(red: 0.2, green: 0.84, blue: 0.29)
+        case .charging: return Theme.green
         case .pluggedIn, .unplugged: return Color.white.opacity(0.9)
-        case .lowBattery(let level): return level <= 10 ? Color(red: 1, green: 0.27, blue: 0.23) : Color(red: 1, green: 0.62, blue: 0.04)
-        case .shelfAdded: return Color(red: 0.25, green: 0.6, blue: 1)
+        case .lowBattery(let level): return level <= 10 ? Theme.red : Theme.orange
+        case .shelfAdded, .shortcutAdded: return Theme.blue
         }
     }
 

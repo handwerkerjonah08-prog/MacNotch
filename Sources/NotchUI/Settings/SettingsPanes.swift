@@ -42,13 +42,14 @@ struct GeneralPane: View {
             }
 
             Section {
-                Toggle("Show what's playing beside the notch", isOn: $model.settings.showNowPlayingActivity)
-                Toggle("Charging alerts", isOn: $model.settings.chargingAlerts)
-                Toggle("Low battery alerts at 20% and 10%", isOn: $model.settings.lowBatteryAlerts)
-            } header: {
-                Text("Live Activities")
+                Button {
+                    island.beginEditing()
+                } label: {
+                    Label("Edit Widgets in the Island", systemImage: "square.grid.2x2")
+                }
+                .glassButtonStyle()
             } footer: {
-                Text("Live activities appear beside the notch without opening the island, like on iPhone.")
+                Text("Choose what shows beside the notch in the Notch section.")
             }
         }
         .formStyle(.grouped)

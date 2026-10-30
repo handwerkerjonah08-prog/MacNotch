@@ -89,19 +89,24 @@ final class ShelfModel: ObservableObject {
         }
     }
 
-    /// Loads file URLs out of drag providers.
-    nonisolated static func fileURLs(from providers: [NSItemProvider]) async -> [URL] {
-        var urls: [URL] = []
-        for provider in providers where provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+    /// Pulls URLs out of drag providers and sorts them into files and web links.
+    nonisolated static func droppedURLs(from providers: [NSItemProvider]) async -> (files: [URL], links: [URL]) {
+        var files: [URL] = []
+        var links: [URL] = []
+        for provider in providers where provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
             let url: URL? = await withCheckedContinuation { continuation in
                 _ = provider.loadObject(ofClass: URL.self) { url, _ in
                     continuation.resume(returning: url)
                 }
             }
-            if let url, url.isFileURL {
-                urls.append(url)
+            guard let url else { continue }
+            if url.isFileURL {
+                files.append(url)
+            } else if let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
+                      let normalized = URLNormalizer.normalize(url.absoluteString) {
+                links.append(normalized)
             }
         }
-        return urls
+        return (files, links)
     }
 }

@@ -1,10 +1,21 @@
 import AppKit
 import NotchCore
 
+/// A site's icon, plus whether it's a dark one-color logo that should be inverted to show on dark glass.
+struct SiteIcon {
+    let image: NSImage
+    let invertsOnDark: Bool
+
+    init(image: NSImage) {
+        self.image = image
+        invertsOnDark = ImageColor.isDarkMonochromeGlyph(image)
+    }
+}
+
 /// Fetches and caches site icons for web page widgets.
 @MainActor
 final class FaviconCache: ObservableObject {
-    @Published private(set) var images: [String: NSImage] = [:]
+    @Published private(set) var icons: [String: SiteIcon] = [:]
 
     private let live: Bool
     private var inFlight: Set<String> = []
@@ -13,14 +24,14 @@ final class FaviconCache: ObservableObject {
     init(live: Bool = true) {
         self.live = live
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
-        directory = caches?.appendingPathComponent("MacNotch/Favicons", isDirectory: true)
+        directory = caches?.appendingPathComponent("MacNotch/SiteIcons-v2", isDirectory: true)
         if let directory {
             try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         }
     }
 
-    func image(for shortcut: WebShortcut) -> NSImage? {
-        images[shortcut.host]
+    func icon(for shortcut: WebShortcut) -> SiteIcon? {
+        icons[shortcut.host]
     }
 
     func load(_ shortcuts: [WebShortcut]) {
@@ -31,10 +42,10 @@ final class FaviconCache: ObservableObject {
 
     func load(_ shortcut: WebShortcut) {
         let host = shortcut.host
-        guard !host.isEmpty, images[host] == nil, !inFlight.contains(host) else { return }
+        guard !host.isEmpty, icons[host] == nil, !inFlight.contains(host) else { return }
 
         if let file = fileURL(for: host), let data = try? Data(contentsOf: file), let image = NSImage(data: data) {
-            images[host] = image
+            icons[host] = SiteIcon(image: image)
             return
         }
         guard live else { return }
@@ -43,7 +54,7 @@ final class FaviconCache: ObservableObject {
         let candidates = URLNormalizer.faviconCandidates(for: shortcut.url)
         Task {
             if let (data, image) = await Self.bestIcon(from: candidates) {
-                images[host] = image
+                icons[host] = SiteIcon(image: image)
                 if let file = fileURL(for: host) {
                     try? data.write(to: file, options: .atomic)
                 }
@@ -57,19 +68,21 @@ final class FaviconCache: ObservableObject {
         return directory?.appendingPathComponent(safe + ".img")
     }
 
-    /// Tries each source in order and keeps the sharpest icon found.
+    /// Tries each source and keeps the best icon, preferring sharp ones with transparent backgrounds.
     nonisolated private static func bestIcon(from candidates: [URL]) async -> (Data, NSImage)? {
-        var best: (data: Data, image: NSImage, pixels: Int)?
+        var best: (data: Data, image: NSImage, score: Int)?
         for url in candidates {
-            guard let (data, image, pixels) = await fetch(url) else { continue }
-            if pixels >= 96 {
+            guard let (data, image, pixels) = await fetch(url), pixels >= 32 else { continue }
+            let transparent = ImageColor.hasTransparentBackground(image)
+            if transparent && pixels >= 96 {
                 return (data, image)
             }
-            if pixels > (best?.pixels ?? 0) {
-                best = (data, image, pixels)
+            let score = pixels * (transparent ? 3 : 1)
+            if score > (best?.score ?? 0) {
+                best = (data, image, score)
             }
         }
-        guard let best, best.pixels >= 32 else { return nil }
+        guard let best else { return nil }
         return (best.data, best.image)
     }
 

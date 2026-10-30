@@ -1,3 +1,4 @@
+import AppKit
 import NotchCore
 import SwiftUI
 
@@ -8,6 +9,20 @@ enum Theme {
     static let cardFill = Color.white.opacity(0.075)
     static let cardStroke = Color.white.opacity(0.09)
     static let cardRadius: CGFloat = 18
+
+    // Apple's own system colors, so status colors match macOS exactly.
+    static let green = Color(nsColor: .systemGreen)
+    static let red = Color(nsColor: .systemRed)
+    static let orange = Color(nsColor: .systemOrange)
+    static let blue = Color(nsColor: .systemBlue)
+    static let indigo = Color(nsColor: .systemIndigo)
+
+    static func batteryColor(level: Int, charging: Bool) -> Color {
+        if charging { return green }
+        if level <= 10 { return red }
+        if level <= 20 { return orange }
+        return Color.white.opacity(0.88)
+    }
 
     /// Opening overshoots a touch, like the iPhone island.
     static let openSpring = Animation.spring(response: 0.46, dampingFraction: 0.74)

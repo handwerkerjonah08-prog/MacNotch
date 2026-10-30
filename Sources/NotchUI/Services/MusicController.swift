@@ -345,6 +345,59 @@ final class DistributedObserver: NSObject {
 }
 
 enum ImageColor {
+    private struct Sample {
+        var coverage: Double
+        var luminance: Double
+        var saturation: Double
+    }
+
+    /// Averages over the opaque pixels of a small copy of the image.
+    private static func sample(_ image: NSImage) -> Sample? {
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+        let side = 24
+        var pixels = [UInt8](repeating: 0, count: side * side * 4)
+        let drawn: Bool = pixels.withUnsafeMutableBytes { buffer in
+            guard let context = CGContext(
+                data: buffer.baseAddress, width: side, height: side,
+                bitsPerComponent: 8, bytesPerRow: side * 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ) else { return false }
+            context.interpolationQuality = .medium
+            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: side, height: side))
+            return true
+        }
+        guard drawn else { return nil }
+
+        var opaque = 0.0, luminance = 0.0, saturation = 0.0
+        for index in stride(from: 0, to: pixels.count, by: 4) {
+            let alpha = Double(pixels[index + 3]) / 255
+            guard alpha > 0.5 else { continue }
+            let rgb = RGB(
+                red: Double(pixels[index]) / 255 / alpha,
+                green: Double(pixels[index + 1]) / 255 / alpha,
+                blue: Double(pixels[index + 2]) / 255 / alpha
+            )
+            opaque += 1
+            luminance += 0.2126 * rgb.red + 0.7152 * rgb.green + 0.0722 * rgb.blue
+            saturation += ColorMath.hsb(from: rgb).saturation
+        }
+        let total = Double(side * side)
+        guard opaque > 0 else { return Sample(coverage: 0, luminance: 0, saturation: 0) }
+        return Sample(coverage: opaque / total, luminance: luminance / opaque, saturation: saturation / opaque)
+    }
+
+    /// True when some of the icon is see-through, i.e. it isn't a filled square.
+    static func hasTransparentBackground(_ image: NSImage) -> Bool {
+        (sample(image)?.coverage ?? 1) < 0.94
+    }
+
+    /// A dark, one-color logo on a transparent background (like Roblox's), which would vanish on dark glass.
+    static func isDarkMonochromeGlyph(_ image: NSImage) -> Bool {
+        guard let sample = sample(image) else { return false }
+        return sample.coverage < 0.94 && sample.coverage > 0.02 && sample.luminance < 0.3 && sample.saturation < 0.3
+    }
+
     /// Saturation-weighted average so vivid parts of the artwork win over gray backgrounds.
     static func averageColor(of image: NSImage) -> RGB? {
         guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }

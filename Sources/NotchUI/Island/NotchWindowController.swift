@@ -190,15 +190,22 @@ final class NotchWindowController {
     }
 
     private func updateFileDrag(at location: CGPoint) {
-        guard model.acceptsFileDrops else { return }
         let pasteboard = NSPasteboard(name: .drag)
-        guard pasteboard.changeCount != dragChangeCount,
-              pasteboard.types?.contains(.fileURL) == true
-        else { return }
+        guard pasteboard.changeCount != dragChangeCount, let types = pasteboard.types else { return }
+
+        let kind: DragKind
+        if types.contains(.fileURL) {
+            kind = model.acceptsFileDrops ? .file : .none
+        } else if types.contains(.URL) {
+            kind = model.acceptsLinkDrops ? .link : .none
+        } else {
+            kind = .none
+        }
+        guard kind != .none else { return }
 
         dragEndTask?.cancel()
         let near = dragZone().contains(location)
-        model.setFileDragNearby(near)
+        model.setDragNearby(near ? kind : .none)
         if near {
             panel.ignoresMouseEvents = false
         }
@@ -211,7 +218,7 @@ final class NotchWindowController {
         dragEndTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 350_000_000)
             guard !Task.isCancelled, let self else { return }
-            self.model.setFileDragNearby(false)
+            self.model.setDragNearby(.none)
             self.updatePointer(at: NSEvent.mouseLocation)
         }
     }

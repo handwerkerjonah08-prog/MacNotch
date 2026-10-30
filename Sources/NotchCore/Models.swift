@@ -153,6 +153,40 @@ public enum IslandMaterial: String, Codable, CaseIterable, Identifiable, Sendabl
     public var title: String { self == .liquidGlass ? "Liquid Glass" : "Classic Black" }
 }
 
+/// What sits beside the notch when nothing else is happening (iPhone's compact leading/trailing views).
+public enum NotchSlot: String, Codable, CaseIterable, Identifiable, Sendable {
+    case none
+    case weather
+    case battery
+    case time
+    case date
+    case shelf
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .none: return "Nothing"
+        case .weather: return "Weather"
+        case .battery: return "Battery"
+        case .time: return "Time"
+        case .date: return "Date"
+        case .shelf: return "File Shelf Count"
+        }
+    }
+
+    public var symbolName: String {
+        switch self {
+        case .none: return "circle.slash"
+        case .weather: return "cloud.sun.fill"
+        case .battery: return "battery.75percent"
+        case .time: return "clock.fill"
+        case .date: return "calendar"
+        case .shelf: return "tray.full.fill"
+        }
+    }
+}
+
 // MARK: - App settings
 
 public struct AppSettings: Codable, Equatable, Sendable {
@@ -170,6 +204,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var chargingAlerts: Bool
     public var lowBatteryAlerts: Bool
     public var hasCompletedOnboarding: Bool
+    public var notchLeading: NotchSlot
+    public var notchTrailing: NotchSlot
 
     public init(
         widgets: [WidgetConfig],
@@ -184,7 +220,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         showNowPlayingActivity: Bool,
         chargingAlerts: Bool,
         lowBatteryAlerts: Bool,
-        hasCompletedOnboarding: Bool
+        hasCompletedOnboarding: Bool,
+        notchLeading: NotchSlot = .none,
+        notchTrailing: NotchSlot = .none
     ) {
         self.widgets = AppSettings.normalizedWidgets(widgets)
         self.shortcuts = shortcuts
@@ -199,6 +237,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.chargingAlerts = chargingAlerts
         self.lowBatteryAlerts = lowBatteryAlerts
         self.hasCompletedOnboarding = hasCompletedOnboarding
+        self.notchLeading = notchLeading
+        self.notchTrailing = notchTrailing
     }
 
     public static let defaultWidgets: [WidgetConfig] = WidgetKind.allCases.map {
@@ -233,6 +273,72 @@ public struct AppSettings: Codable, Equatable, Sendable {
         widgets.first { $0.kind == kind }?.isEnabled ?? false
     }
 
+    /// Widgets that are turned off, for the island's Add Widget menu.
+    public var disabledWidgetKinds: [WidgetKind] {
+        widgets.filter { !$0.isEnabled }.map(\.kind)
+    }
+
+    /// True when something is chosen to sit beside the notch.
+    public var showsNotchInfo: Bool {
+        notchLeading != .none || notchTrailing != .none
+    }
+
+    // MARK: Editing
+
+    /// Turns a widget on (placing it after the other visible widgets) or off.
+    public mutating func setWidget(_ kind: WidgetKind, enabled: Bool) {
+        guard let index = widgets.firstIndex(where: { $0.kind == kind }) else { return }
+        guard widgets[index].isEnabled != enabled else { return }
+        var item = widgets.remove(at: index)
+        item.isEnabled = enabled
+        let visible = widgets.filter(\.isEnabled)
+        let hidden = widgets.filter { !$0.isEnabled }
+        widgets = visible + [item] + hidden
+    }
+
+    /// Moves a visible widget to a new position among the visible widgets.
+    public mutating func moveEnabledWidget(_ kind: WidgetKind, toEnabledIndex index: Int) {
+        var visible = widgets.filter(\.isEnabled)
+        guard let from = visible.firstIndex(where: { $0.kind == kind }) else { return }
+        let item = visible.remove(at: from)
+        visible.insert(item, at: min(max(index, 0), visible.count))
+        widgets = visible + widgets.filter { !$0.isEnabled }
+    }
+
+    public mutating func moveShortcut(id: UUID, to index: Int) {
+        guard let from = shortcuts.firstIndex(where: { $0.id == id }) else { return }
+        let item = shortcuts.remove(at: from)
+        shortcuts.insert(item, at: min(max(index, 0), shortcuts.count))
+    }
+
+    public mutating func removeShortcut(id: UUID) {
+        shortcuts.removeAll { $0.id == id }
+    }
+
+    /// Same site and page, ignoring "www.", scheme and a trailing slash.
+    public func containsShortcut(for url: URL) -> Bool {
+        let key = Self.shortcutKey(for: url)
+        return shortcuts.contains { Self.shortcutKey(for: $0.url) == key }
+    }
+
+    /// Saves a web page unless it's already saved. Returns the new shortcut.
+    @discardableResult
+    public mutating func addShortcut(for url: URL, name: String? = nil) -> WebShortcut? {
+        guard !containsShortcut(for: url) else { return nil }
+        let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let shortcut = WebShortcut(name: trimmed.isEmpty ? URLNormalizer.suggestedName(for: url) : trimmed, url: url)
+        shortcuts.append(shortcut)
+        return shortcut
+    }
+
+    static func shortcutKey(for url: URL) -> String {
+        var host = url.host?.lowercased() ?? ""
+        if host.hasPrefix("www.") { host = String(host.dropFirst(4)) }
+        var path = url.path
+        while path.hasSuffix("/") { path.removeLast() }
+        return host + path
+    }
+
     /// Keeps the user's order, drops duplicates and appends any kinds a newer version added.
     public static func normalizedWidgets(_ widgets: [WidgetConfig]) -> [WidgetConfig] {
         var seen = Set<WidgetKind>()
@@ -253,6 +359,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case widgets, shortcuts, weatherLocation, temperatureUnit, expandTrigger, islandMaterial
         case glassTint, hapticsEnabled, showMenuBarIcon, showNowPlayingActivity
         case chargingAlerts, lowBatteryAlerts, hasCompletedOnboarding
+        case notchLeading, notchTrailing
     }
 
     public init(from decoder: Decoder) throws {
@@ -277,7 +384,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
             showNowPlayingActivity: (try? c.decodeIfPresent(Bool.self, forKey: .showNowPlayingActivity)) ?? d.showNowPlayingActivity,
             chargingAlerts: (try? c.decodeIfPresent(Bool.self, forKey: .chargingAlerts)) ?? d.chargingAlerts,
             lowBatteryAlerts: (try? c.decodeIfPresent(Bool.self, forKey: .lowBatteryAlerts)) ?? d.lowBatteryAlerts,
-            hasCompletedOnboarding: (try? c.decodeIfPresent(Bool.self, forKey: .hasCompletedOnboarding)) ?? d.hasCompletedOnboarding
+            hasCompletedOnboarding: (try? c.decodeIfPresent(Bool.self, forKey: .hasCompletedOnboarding)) ?? d.hasCompletedOnboarding,
+            notchLeading: (try? c.decodeIfPresent(NotchSlot.self, forKey: .notchLeading)) ?? d.notchLeading,
+            notchTrailing: (try? c.decodeIfPresent(NotchSlot.self, forKey: .notchTrailing)) ?? d.notchTrailing
         )
     }
 }
