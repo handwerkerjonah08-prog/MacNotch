@@ -32,9 +32,14 @@ done
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
 
 echo "==> Signing (ad-hoc)"
+# Stray extended attributes (Finder info, resource forks) break signatures and cause
+# "app is damaged" errors after download, so strip them before signing.
+xattr -cr "$APP"
 codesign --force --deep --sign - --timestamp=none "$APP"
-codesign --verify --strict --verbose=2 "$APP"
+codesign --verify --deep --strict --verbose=2 "$APP"
 plutil -lint "$APP/Contents/Info.plist"
+echo "Gatekeeper's verdict (expected: rejected until approved with Open Anyway, since it isn't notarized):"
+spctl --assess --type execute --verbose=4 "$APP" 2>&1 || true
 
 echo "==> Creating DMG"
 STAGING="$BUILD_DIR/dmg"
@@ -44,6 +49,13 @@ cp -R "$APP" "$STAGING/"
 ln -s /Applications "$STAGING/Applications"
 hdiutil create -volname "MacNotch" -srcfolder "$STAGING" -ov -format UDZO "$BUILD_DIR/MacNotch.dmg" >/dev/null
 rm -rf "$STAGING"
+hdiutil verify "$BUILD_DIR/MacNotch.dmg" >/dev/null && echo "DMG checksum verified"
+
+echo "==> Checking the app inside the DMG still has a valid signature"
+MOUNT="$(mktemp -d)"
+hdiutil attach "$BUILD_DIR/MacNotch.dmg" -nobrowse -readonly -mountpoint "$MOUNT" >/dev/null
+codesign --verify --deep --strict "$MOUNT/MacNotch.app" && echo "Signature intact inside DMG"
+hdiutil detach "$MOUNT" >/dev/null
 
 echo "==> Done"
 ls -lh "$BUILD_DIR/MacNotch.dmg"

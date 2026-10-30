@@ -15,7 +15,7 @@ final class ShelfModel: ObservableObject {
         persistence = live ? CodableDefaults(key: StorageKeys.shelf) : nil
         store = persistence?.load() ?? ShelfStore()
         if live {
-            store.pruneMissing { FileManager.default.fileExists(atPath: $0) }
+            store.pruneMissing { !Self.isDefinitelyGone($0) }
             store.items.forEach(makeThumbnail)
         }
     }
@@ -63,7 +63,7 @@ final class ShelfModel: ObservableObject {
     /// Re-checks that files still exist, e.g. after one was dragged out and moved.
     func pruneMissing() {
         let before = store.items.count
-        store.pruneMissing { FileManager.default.fileExists(atPath: $0) }
+        store.pruneMissing { !Self.isDefinitelyGone($0) }
         if store.items.count != before {
             save()
         }
@@ -71,6 +71,12 @@ final class ShelfModel: ObservableObject {
 
     private func save() {
         persistence?.save(store)
+    }
+
+    /// True only when the file no longer exists. A file in Desktop, Documents or Downloads that macOS
+    /// hasn't let MacNotch see yet reports "not permitted", not "missing", so it stays on the shelf.
+    nonisolated static func isDefinitelyGone(_ path: String) -> Bool {
+        access(path, F_OK) != 0 && errno == ENOENT
     }
 
     private func makeThumbnail(for item: ShelfItem) {

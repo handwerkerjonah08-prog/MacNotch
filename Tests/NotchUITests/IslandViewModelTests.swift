@@ -320,6 +320,14 @@ final class IslandViewModelTests: XCTestCase {
         XCTAssertNil(ImageColor.removingBackground(busy))
     }
 
+    func testOnlyTrulyMissingFilesLeaveTheShelf() throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("keep-\(UUID().uuidString)")
+        try "x".write(to: file, atomically: true, encoding: .utf8)
+        XCTAssertFalse(ShelfModel.isDefinitelyGone(file.path))
+        try FileManager.default.removeItem(at: file)
+        XCTAssertTrue(ShelfModel.isDefinitelyGone(file.path))
+    }
+
     func testDistributedObserverReceivesBroadcasts() {
         let expectation = expectation(description: "notification")
         let name = "app.macnotch.tests.\(UUID().uuidString)"
