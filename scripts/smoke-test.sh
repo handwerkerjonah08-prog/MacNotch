@@ -34,6 +34,7 @@ shoot_at() {
     exit 1
   fi
   screencapture -x "build/screens/$name.png" 2>/dev/null || echo "screencapture unavailable for $name"
+  python3 -c "import time; print('shot $name at %.2fs' % (time.time() - $START))"
 }
 
 shoot_at 3 screen-01-compact

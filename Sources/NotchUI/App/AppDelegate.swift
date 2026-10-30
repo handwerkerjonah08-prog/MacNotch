@@ -16,6 +16,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: SettingsWindowController!
     private var statusItem: StatusItemController!
     private var cancellables = Set<AnyCancellable>()
+    /// Keeps App Nap from slowing the island's timers while it sits in the background.
+    private var activity: NSObjectProtocol?
 
     private let arguments = ProcessInfo.processInfo.arguments
 
@@ -33,6 +35,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         NSApp.mainMenu = MainMenu.make(target: self)
+        // The island reacts to the pointer and runs short timers (hover delay, alerts), so it must
+        // never be napped. The Mac can still sleep normally.
+        activity = ProcessInfo.processInfo.beginActivity(
+            options: [.userInitiatedAllowingIdleSystemSleep],
+            reason: "MacNotch keeps the Dynamic Island responsive"
+        )
 
         settings = SettingsModel()
         music = MusicController()
@@ -147,9 +155,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         if let mark = ProcessInfo.processInfo.environment["MACNOTCH_DEMO_MARK"] {
             try? String(Date().timeIntervalSince1970).write(toFile: mark, atomically: true, encoding: .utf8)
         }
+        let start = Date()
         for (index, action) in steps.enumerated() {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1 + Double(index) * 4) {
-                MainActor.assumeIsolated { action() }
+                MainActor.assumeIsolated {
+                    action()
+                    print(String(format: "demo step %d ran at %.2fs", index, Date().timeIntervalSince(start)))
+                    fflush(stdout)
+                }
             }
         }
     }
