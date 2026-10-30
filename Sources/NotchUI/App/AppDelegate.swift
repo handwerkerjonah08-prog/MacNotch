@@ -107,7 +107,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         showDemoBackdrop()
         if let screen = NotchWindowController.targetScreen() {
             let lab = GlassLab.show(on: screen)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4.6) { lab.orderOut(nil) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.6) {
+                MainActor.assumeIsolated { lab.orderOut(nil) }
+            }
         }
         music.preview(track: DemoContent.track, state: .playing, artwork: DemoContent.artwork(), elapsed: 150)
         let steps: [() -> Void] = [
